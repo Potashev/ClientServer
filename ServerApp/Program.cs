@@ -10,7 +10,7 @@ using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
 using System.IO;
 
-namespace ServerApp
+namespace ServerProject
 {
     class Program
     {
@@ -115,8 +115,6 @@ namespace ServerApp
             serverSocket.Close();
 
         }
-
-
         static void CreateTopology() {
             string ip;
             int id;

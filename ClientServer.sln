@@ -3,9 +3,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.27004.2002
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ServerApp", "ServerApp\ServerApp.csproj", "{CAF14E3A-1441-4814-9ABE-D3E6DBE5FAC0}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ServerProject", "ServerApp\ServerProject.csproj", "{CAF14E3A-1441-4814-9ABE-D3E6DBE5FAC0}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MainClient", "MainClient\MainClient.csproj", "{8B699D67-97B5-4E11-8F6E-37C3138B1072}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ClientProject", "MainClient\ClientProject.csproj", "{8B699D67-97B5-4E11-8F6E-37C3138B1072}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
