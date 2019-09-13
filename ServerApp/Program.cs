@@ -274,19 +274,27 @@ namespace ServerProject
         static void Main(string[] args) {
             Console.WriteLine("\tServer");
 
+            Server server = new Server();
+
             Console.WriteLine("Ввод топологии ?");
             string str = Console.ReadLine();
+            bool createTopology = false;
 
             if (str == "+")
             {
-                AcceptForTopology();
-                CreateTopology();
+                createTopology = true;
+                //AcceptForTopology();
+                //CreateTopology();
             }
+
+            server.Run(createTopology);
+
             Console.WriteLine("Прием пакетов");
             // прослушку запускаю раньше топологии, тк она отправляется не всем сразу,
             // а каждому, сразу после ввода, если клиентов несколько, начнутся проблемы
-            Thread acceptThread = new Thread(AcceptConnections);
-            acceptThread.Start();
+
+            //Thread acceptThread = new Thread(AcceptConnections);
+            //acceptThread.Start();
 
             //CreateTopology();
 

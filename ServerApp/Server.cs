@@ -1,24 +1,28 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Runtime.Serialization;
+using System.Runtime.Serialization.Json;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace ServerApp {
+namespace ServerProject {
     public class Server {
 
-        const string SERVER_IP = "192.168.1.105";   // TODO: брать ip терминала либо методом, либо вводить при запуске
+        const string SERVER_IP = "192.168.1.106";   // TODO: брать ip терминала либо методом, либо вводить при запуске
+
+        static object locker = new object();    // TODO: попробовать перенести locker в SendNeibs
 
         // списох узлов, которые подключаются по топологии
         List<ConnectionInfo> Connections = new List<ConnectionInfo>();
         // список всех узлов, подключившихся к серву для топологии
         //static List<Client> Clients = new List<Client>();// TODO: разобраться, почему требует static для списка
         // список узлов-соседей, который отправляется каждому клиенту по топологии (у каждого клиента свой список)
-        List<Unit> Neibs = new List<Unit>();
+        //List<Unit> Neibs = new List<Unit>();
 
         public void Run(bool createTopology) {
 
@@ -31,15 +35,16 @@ namespace ServerApp {
                 //CreateTopology();
 
             }
-            Console.WriteLine("Прием пакетов");
+            //Console.WriteLine("Прием пакетов");
             // прослушку запускаю раньше топологии, тк она отправляется не всем сразу,
             // а каждому, сразу после ввода, если клиентов несколько, начнутся проблемы
-            Thread acceptThread = new Thread(AcceptConnections);
-            acceptThread.Start();
+
+            //Thread acceptThread = new Thread(AcceptConnections);
+            //acceptThread.Start();
 
             //CreateTopology();
 
-            Console.ReadLine();
+            //Console.ReadLine();
 
         }
         private void ConnectAllForTopology(int clientsCount=1) {
@@ -53,6 +58,8 @@ namespace ServerApp {
             CreateTopology(сlients);
 
             CloseConnectionForTopology(сlients);
+
+            сlients.Clear();
 
         }
 
@@ -81,82 +88,173 @@ namespace ServerApp {
 
         //void Print
 
+        void ShowClients (List<Client> clients){
+            PrintMessage("Список клиентов:");
+            string ip;
+            int id;
+            foreach (Client cl in clients) {
+                ip = Convert.ToString(cl._socket.RemoteEndPoint);
+                id = cl._id;
+                PrintMessage($"ip:port = {ip}, id = {id}");
+            }
+            PrintMessage("\n*id=0 - сервер");
+        }
+
+        // TODO: проверрить и далее поменять на делегат
+        int? GetNeibId() {
+            PrintMessage("Id:");
+            string strId = Console.ReadLine();
+            if(strId == "") {
+                return null;
+            }
+            else {
+                int id = int.Parse(strId);
+                return id;
+            }
+        }
+
+        int GetNeibPriority() {
+            PrintMessage("Priority:");
+            int priority = int.Parse(Console.ReadLine());
+            return priority;
+        }
+
+        List<Unit> GetNeibsForClient(Client client, List<Client> clients) {
+
+            string clientIp = client.GetIpPort();
+            int clientId = client._id;
+
+            PrintMessage($"Для узла {clientIp} (id = {clientId}):");
+
+            List<Unit> neibs = new List<Unit>();
+            while (true) {
+
+                // ввожу id соседа
+                // ищу клиента с таким id
+                // ввожу priority для соседа
+                // получаю ip соседа
+                //получаю port соседа
+                // создаю юнит
+                // добавляю unit в список
+
+                int? id = GetNeibId();
+                // проверка значения id на выход из цикла
+                
+                if(id == null) {
+                    break;
+                }
+
+                foreach(Client cl in clients) {
+
+                    if (id == 0) {
+                        Unit NeibServer = new Unit(SERVER_IP, 1, 700);
+                        neibs.Add(NeibServer);
+                        continue;
+                    }
+
+                    if (cl._id == id) {
+                       int priority = GetNeibPriority();
+                        string ip = cl.GetIp();
+                        int port = cl._acceptPort;
+                        Unit n = new Unit(ip, priority, port);
+                        neibs.Add(n);
+                        break;
+                    }
+                }
+
+            }
+
+            return neibs;
+        }
+
         void CreateTopology(List<Client> clients) {
             string ip;
             int id;
 
 
             // ОТОБРАЖЕНИЕ СПИСКА ПОДКЛЮЧЕННЫХ СОЕДИНЕНИЙ (ВСЕХ КЛИЕНТОВ)
-            Console.WriteLine("Список клиентов:");
-            foreach (Client cl in Clients) {
-                ip = Convert.ToString(cl._socket.RemoteEndPoint);
-                id = cl._id;
-                Console.WriteLine("ip:port = " + ip + " , id = " + id);
-            }
-            Console.WriteLine("\n*id=0 - сервер");
-
+            ShowClients(clients);
 
             // ФОРМИРОВАНИЕ И ОТПРАВКА СОСЕДЕЙ ДЛЯ КАЖДОГО СОЕДИНЕНИЯ
-            foreach (Client client in Clients) {
+            foreach (Client client in clients) {
+
                 ip = Convert.ToString(client._socket.RemoteEndPoint);
                 id = client._id;
-                Console.WriteLine("Для узла " + ip + " (id " + id + ")");
-                
-                // ФОРМИРОВАНИЕ СОСЕДЕЙ ДЛЯ УЗЛА
-                while (true) {
-                    Console.Write("Id: ");
-                    string strId = Console.ReadLine();
-                    if (strId == "") {
-                        Console.WriteLine("Конец списка");
-                        break;
-                    }
-                    int neibId = Convert.ToInt32(strId);
-                    if (neibId == 0) {
-                        Unit NeibServer = new Unit(ServerIp, 1, 700);
-                        Neibs.Add(NeibServer);
-                        continue;
-                    }
-                    Console.Write("Value: ");
-                    int neibPriority = Convert.ToInt32(Console.ReadLine());
-                    foreach (Client cl in Clients) {     // позже при добавлении сервера-соседа ставить флаг не заходить в цикл
-                        if (cl._id == neibId) {
-                            string neibIp = cl.GetIp();
-                            int neibAcceptPort = cl._acceptPort;
-                            Unit newNeib = new Unit(neibIp, neibPriority, neibAcceptPort);
-                            Neibs.Add(newNeib);
-                            break;
-                        }
-                    }
 
-                }
+                // получение списка соседей для заданного ip(id)
+
+                List<Unit> Neibs = GetNeibsForClient(client, clients);
+
+                #region GetNeibs в моем случае
+                //while (true) {
+                //    Console.Write("Id: ");
+                //    string strId = Console.ReadLine();
+                //    if (strId == "") {
+                //        Console.WriteLine("Конец списка");
+                //        break;
+                //    }
+                //    int neibId = Convert.ToInt32(strId);
+                //if (neibId == 0) {
+                //    Unit NeibServer = new Unit(ServerIp, 1, 700);
+                //    Neibs.Add(NeibServer);
+                //    continue;
+                //}
+                //    Console.Write("Value: ");
+                //    int neibPriority = Convert.ToInt32(Console.ReadLine());
+                //    foreach (Client cl in Clients) {     // позже при добавлении сервера-соседа ставить флаг не заходить в цикл
+                //        if (cl._id == neibId) {
+                //            string neibIp = cl.GetIp();
+                //            int neibAcceptPort = cl._acceptPort;
+                //            Unit newNeib = new Unit(neibIp, neibPriority, neibAcceptPort);
+                //            Neibs.Add(newNeib);
+                //            break;
+                //        }
+                //    }
+
+                //}
+                #endregion
 
                 // ПОДГОТОВКА СПИСКА СОСЕДЕЙ ДЛЯ ОТПРАВЛЕНИЯ КЛИЕНТУ
-                byte[] buffer = new byte[1000];
-                DataContractJsonSerializer jsonSerializer = new DataContractJsonSerializer(typeof(List<Unit>));
-                MemoryStream stream = new MemoryStream();
-                jsonSerializer.WriteObject(stream, Neibs);
+
+                //CreateByteBuffer()
+
+                //byte[] buffer;
+                ConvertNeibsForSending(Neibs, out byte[] buffer);
                 Neibs.Clear();
-                buffer = stream.GetBuffer();
-                stream.Close();
-                
-                
+
+                //byte[] buffer = new byte[1000];
+                //DataContractJsonSerializer jsonSerializer = new DataContractJsonSerializer(typeof(List<Unit>));
+                //MemoryStream stream = new MemoryStream();
+                //jsonSerializer.WriteObject(stream, Neibs);
+                //Neibs.Clear();
+                //buffer = stream.GetBuffer();
+                //stream.Close();
+
+
                 // ПЕРЕДАЧА КЛИЕНТУ
-                lock (locker) {
-                    client._socket.Send(buffer);
+
+                SendNeibs(client, buffer);
+
+                //lock (locker) {
+                //    client._socket.Send(buffer);
 
 
-                    string clientId = Convert.ToString(client._id);
-                    client._socket.Send(Encoding.ASCII.GetBytes(clientId));
-                    Thread.Sleep(2000);
-                    string clientAcceptPort = Convert.ToString(client._acceptPort);
-                    client._socket.Send(Encoding.ASCII.GetBytes(clientAcceptPort));
+                //    string clientId = Convert.ToString(client._id);
+                //    client._socket.Send(Encoding.ASCII.GetBytes(clientId));
+                //    Thread.Sleep(2000);
+                //    string clientAcceptPort = Convert.ToString(client._acceptPort);
+                //    client._socket.Send(Encoding.ASCII.GetBytes(clientAcceptPort));
 
 
-                }
+                //}
+
+
+
                 //string clientId = Convert.ToString(client._id);
                 //client._socket.Send(Encoding.ASCII.GetBytes(clientId));
 
-                Console.WriteLine("Топология отправлена " + ip);
+                PrintMessage("Топология отправлена " + ip);
+
                 //client._socket.Close();     // проверить
 
             }
@@ -164,11 +262,41 @@ namespace ServerApp {
 
             // ЗАКРЫТИЕ СОЕДИНЕНИЙ С КЛИЕНТАМИ (перенести в closeconnect)
             // проверить
-            foreach (Client cl in Clients) {
+            //foreach (Client cl in Clients) {
+            //    //cl._socket.Shutdown((SocketShutdown.Both));
+            //    cl._socket.Close();
+            //}
+            //Clients.Clear();
+        }
+
+        void SendNeibs(Client client, byte[] buffer) {
+            lock (locker) {
+                client._socket.Send(buffer);
+
+
+                string clientId = Convert.ToString(client._id);
+                client._socket.Send(Encoding.ASCII.GetBytes(clientId));
+                Thread.Sleep(2000);
+                string clientAcceptPort = Convert.ToString(client._acceptPort);
+                client._socket.Send(Encoding.ASCII.GetBytes(clientAcceptPort));
+            }
+        }
+
+        void ConvertNeibsForSending(List<Unit> neibs, out byte[] buffer) {
+            buffer = new byte[1000];
+            DataContractJsonSerializer jsonSerializer = new DataContractJsonSerializer(typeof(List<Unit>));
+            MemoryStream stream = new MemoryStream();
+            jsonSerializer.WriteObject(stream, neibs);
+            //Neibs.Clear();
+            buffer = stream.GetBuffer();
+            stream.Close();
+        }
+
+        void CloseConnectionForTopology(List<Client> clients) {
+            foreach (Client cl in clients) {
                 //cl._socket.Shutdown((SocketShutdown.Both));
                 cl._socket.Close();
             }
-            Clients.Clear();
         }
 
         void PrintMessage(string message) {
@@ -215,6 +343,11 @@ namespace ServerApp {
             _acceptPort = acceptPort;
             countClients++;
             acceptPort++;
+        }
+
+        public string GetIpPort() {
+            string ipPort = Convert.ToString(_socket.RemoteEndPoint);
+            return ipPort;
         }
 
         // мб найти получше
