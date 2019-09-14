@@ -17,7 +17,8 @@ namespace ClientProject
 
         static object locker = new object();
 
-        static string serverIp = "192.168.1.106";
+        //static string serverIp = "192.168.1.106";
+        static string serverIp = "172.20.10.2";
 
         [DataContract]
         public class Unit
@@ -440,30 +441,30 @@ namespace ClientProject
                 AcceptForTopology();
             }
 
-            //Console.WriteLine("id: " + Convert.ToString(myId));
-            //Console.WriteLine("port: " + Convert.ToString(myAcceptPort));
-            //Console.WriteLine("Начать?");
-            //Console.ReadLine();
+            Console.WriteLine("id: " + Convert.ToString(myId));
+            Console.WriteLine("port: " + Convert.ToString(myAcceptPort));
+            Console.WriteLine("Начать?");
+            Console.ReadLine();
 
-            //OutConnect();
+            OutConnect();
 
-            //if (!NoAccept()) {
-            //    Console.WriteLine("Есть входящие подключения");
-            //    Thread acceptThread = new Thread(Accept);
-            //    acceptThread.Start();
-            //}
-            //else {
-            //    Console.WriteLine("Входящих подключений нет");
-            //    //Generation();
-            //}
+            if (!NoAccept()) {
+                Console.WriteLine("Есть входящие подключения");
+                Thread acceptThread = new Thread(Accept);
+                acceptThread.Start();
+            }
+            else {
+                Console.WriteLine("Входящих подключений нет");
+                //Generation();
+            }
 
-            //Thread generationThread = new Thread(Generation);
-            //generationThread.Start();
+            Thread generationThread = new Thread(Generation);
+            generationThread.Start();
 
-            ////Generation();
+            //Generation();
 
-            //Thread sendThread = new Thread(Sending);
-            //sendThread.Start();
+            Thread sendThread = new Thread(Sending);
+            sendThread.Start();
 
             Console.ReadLine();
         }

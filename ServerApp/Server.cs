@@ -13,9 +13,17 @@ using System.Threading.Tasks;
 namespace ServerProject {
     public class Server {
 
-        const string SERVER_IP = "192.168.1.106";   // TODO: брать ip терминала либо методом, либо вводить при запуске
+        //const string SERVER_IP = "192.168.1.106";   // TODO: брать ip терминала либо методом, либо вводить при запуске
+        const string SERVER_IP = "172.20.10.2";
+        const int ACCEPT_PORT = 700;
 
         static object locker = new object();    // TODO: попробовать перенести locker в SendNeibs
+
+        public delegate string inputData();
+        inputData input;
+        public delegate void outputData(string message);
+        outputData output;
+
 
         // списох узлов, которые подключаются по топологии
         List<ConnectionInfo> Connections = new List<ConnectionInfo>();
@@ -24,54 +32,119 @@ namespace ServerProject {
         // список узлов-соседей, который отправляется каждому клиенту по топологии (у каждого клиента свой список)
         //List<Unit> Neibs = new List<Unit>();
 
+        public Server(inputData userInput, outputData userOutput) {
+            input = userInput;
+            output = userOutput;
+        }
+
         public void Run(bool createTopology) {
 
             if (createTopology) {
-
-
                 ConnectAllForTopology();
-
-                //AcceptForTopology();
-                //CreateTopology();
-
             }
-            //Console.WriteLine("Прием пакетов");
+            PrintMessage("Прием пакетов");
             // прослушку запускаю раньше топологии, тк она отправляется не всем сразу,
             // а каждому, сразу после ввода, если клиентов несколько, начнутся проблемы
 
-            //Thread acceptThread = new Thread(AcceptConnections);
-            //acceptThread.Start();
-
-            //CreateTopology();
-
-            //Console.ReadLine();
-
+            Thread acceptThread = new Thread(AcceptConnections);
+            acceptThread.Start();
         }
+
+        void AcceptConnections() {
+            Socket serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            serverSocket.Bind(new IPEndPoint(IPAddress.Any, ACCEPT_PORT));
+            serverSocket.Listen(1);             // аргумент не влияет?
+            while (true) {
+
+                // Принимаем соединение
+                Socket socket = serverSocket.Accept();
+                ConnectionInfo connection = new ConnectionInfo();
+                connection.Socket = socket;
+                connection.Thread = new Thread(ProcessConnection);
+                connection.Thread.IsBackground = true;
+                connection.Thread.Start(connection);
+                Connections.Add(connection);
+            }
+        }
+
+
+        DataPacket GetDataFromBuffer(byte[] buffer) {
+            DataContractJsonSerializer serializer = new DataContractJsonSerializer(typeof(DataPacket));
+            DataPacket packet = new DataPacket();
+            byte[] streamBuffer = new byte[BytesInCollection(buffer)];
+            CopyFromTo(buffer, streamBuffer);
+            MemoryStream stream = new MemoryStream(streamBuffer);
+            stream.Position = 0;    // необязательно?
+            packet = (DataPacket)serializer.ReadObject(stream);
+            stream.Close();
+            return packet;
+        }
+
+        // сам процесс подключения, у каждого подключившегося свой процесс в своем потоке
+        void ProcessConnection(object state) {
+            ConnectionInfo connection = (ConnectionInfo)state;
+            byte[] buffer = new byte[255];
+            try {
+                while (true) {
+                    int bytesRead = connection.Socket.Receive(buffer);
+                    if (bytesRead > 0) {
+                        try {
+                            DataPacket packet = GetDataFromBuffer(buffer);
+                            PrintMessage($"Узел: {packet._unitId}, пакет: {packet._number} , данные: {packet._value}");
+                        }
+                        catch (Exception ex) {
+                            continue;
+                        }
+
+                    }
+                    else if (bytesRead == 0) return;
+                }
+            }
+            catch (SocketException exc) {
+                Console.WriteLine("Socket exception: " +
+                    exc.SocketErrorCode);
+            }
+            catch (Exception exc) {
+                Console.WriteLine("Exception: " + exc);
+            }
+            finally {
+                connection.Socket.Close();
+                lock (Connections) Connections.Remove(
+                    connection);
+            }
+        }
+
+        int BytesInCollection(byte[] collection) {
+            int count = 0;
+            while (collection[count] != 0) {
+                count++;
+            }
+            return count;
+        }
+        void CopyFromTo(byte[] bufferFrom, byte[] bufferTO) {
+            for (int i = 0; i < bufferTO.Length; i++) {
+                bufferTO[i] = bufferFrom[i];
+            }
+        }
+
+
         private void ConnectAllForTopology(int clientsCount=1) {
 
             // TODO: возможно позже здесь формировать список клиентов и передавать в методы
 
             List<Client> сlients = new List<Client>();
-
             OpenConnectForTopology(clientsCount, сlients);
-
             CreateTopology(сlients);
-
             CloseConnectionForTopology(сlients);
-
             сlients.Clear();
 
         }
 
-         void OpenConnectForTopology(int clientsCount, List<Client> clients) {
+        void OpenConnectForTopology(int clientsCount, List<Client> clients) {
             Socket serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             serverSocket.Bind(new IPEndPoint(IPAddress.Any, 999));
             serverSocket.Listen(1);
-            //Console.WriteLine("Ввод числа подключений:");
             PrintMessage($"Ожидаемое число подключений: {clientsCount}");
-
-            //int count = Convert.ToInt32(Console.ReadLine());
-            //Console.WriteLine("Ожидание подключений..");
             PrintMessage("Ожидание подключений...");
             for (int i = 0; i < clientsCount; i++) {
                 Socket socket = serverSocket.Accept();
@@ -86,8 +159,6 @@ namespace ServerProject {
 
         }
 
-        //void Print
-
         void ShowClients (List<Client> clients){
             PrintMessage("Список клиентов:");
             string ip;
@@ -100,11 +171,12 @@ namespace ServerProject {
             PrintMessage("\n*id=0 - сервер");
         }
 
-        // TODO: проверрить и далее поменять на делегат
+        
+        // TODO: Добавить проверку на дурака
         int? GetNeibId() {
             PrintMessage("Id:");
-            string strId = Console.ReadLine();
-            if(strId == "") {
+            string strId = InputData();
+            if (strId == "") {
                 return null;
             }
             else {
@@ -113,9 +185,10 @@ namespace ServerProject {
             }
         }
 
+        // TODO: Добавить проверку на дурака
         int GetNeibPriority() {
             PrintMessage("Priority:");
-            int priority = int.Parse(Console.ReadLine());
+            int priority = int.Parse(InputData());
             return priority;
         }
 
@@ -147,7 +220,7 @@ namespace ServerProject {
                 foreach(Client cl in clients) {
 
                     if (id == 0) {
-                        Unit NeibServer = new Unit(SERVER_IP, 1, 700);
+                        Unit NeibServer = new Unit(SERVER_IP, 1, ACCEPT_PORT);
                         neibs.Add(NeibServer);
                         continue;
                     }
@@ -300,7 +373,12 @@ namespace ServerProject {
         }
 
         void PrintMessage(string message) {
-            Console.WriteLine(message);
+            output(message);
+        }
+
+        // TODO: возможно функцию убрать и вызывать делегат
+        string InputData() {
+            return input();
         }
     }
 
@@ -319,6 +397,24 @@ namespace ServerProject {
             priority = weight;
             acceptPort = port;
         }
+    }
+
+    [DataContract]
+    public class DataPacket {
+        [DataMember]
+        public int _unitId;
+        [DataMember]
+        public int _number;
+        [DataMember]
+        public int _value;
+
+        //static int packetCount = 1;
+        //public DataPacket(int value) {
+        //    _unitId = myId;
+        //    _number = packetCount;
+        //    _value = value;
+        //    packetCount++;
+        //}
     }
 
     // связывает сокет с потоком (надо, если по топологии к серву несколько подключений)

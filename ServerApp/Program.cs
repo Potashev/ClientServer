@@ -274,7 +274,7 @@ namespace ServerProject
         static void Main(string[] args) {
             Console.WriteLine("\tServer");
 
-            Server server = new Server();
+            Server server = new Server(Console.ReadLine, Console.WriteLine);
 
             Console.WriteLine("Ввод топологии ?");
             string str = Console.ReadLine();
@@ -289,7 +289,7 @@ namespace ServerProject
 
             server.Run(createTopology);
 
-            Console.WriteLine("Прием пакетов");
+            //Console.WriteLine("Прием пакетов");
             // прослушку запускаю раньше топологии, тк она отправляется не всем сразу,
             // а каждому, сразу после ввода, если клиентов несколько, начнутся проблемы
 
