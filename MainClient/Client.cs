@@ -1,4 +1,5 @@
-﻿using System;
+﻿using ClientServerLib;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -10,110 +11,105 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace ClientProject
-{
-    class Program
-    {
-
+namespace ClientProject {
+    class Client {
         static object locker = new object();
 
-        //static string serverIp = "192.168.1.106";
-        static string serverIp = "172.20.10.2";
+        // TODO: потом у клиента айпи сервера убрать из кода:
+        // либо ввод консоли, либо чтение файла
 
-        [DataContract]
-        public class Unit
-        {
-            [DataMember]
-            public string ip;
-            [DataMember]
-            public int priority;        // пока >0 - отправка (с приоритетом), -1 - прием
-            [DataMember]
-            public int acceptPort;
+        string serverIp = "192.168.1.104";
+        //string serverIp = "172.20.10.2";
 
-            public Socket socket;       // нужны только у узлов отправки (сокет + приоритет = динам маршрут)
 
-            public bool died;       // нужны только у узлов отправки
+        int acceptPort;
+        int clientId;
 
-            public Unit(string addr, int weight, int port) {
-                ip = addr;
-                priority = weight;
+        byte[] localMemory = new byte[10000];
 
-                acceptPort = port;
-
-                //activity = true;
-                died = false;
-            }
-        }
-
-        [DataContract]
-        public class DataPacket
-        {
-            [DataMember]
-            public int _unitId;
-            [DataMember]
-            public int _number;
-            [DataMember]
-            public int _value;
-
-            static int packetCount = 1;
-            public DataPacket(int value)
-            {
-                _unitId = myId;
-                _number = packetCount;
-                _value = value;
-                packetCount++;
-            }
-        }
-
-        // входящие сокеты (работают в потоках), связывает сокет с потоком
-        public class AcceptConnectionInfo
-        {
-            public Socket Socket;
-            public Thread Thread;
-        }
-
-        static int myAcceptPort;
-
-        static int myId;
-        
-        static byte[] localMemory = new byte[10000];
-
-        static List<Unit> Neighbors = new List<Unit>();
+        List<Unit> Neighbors = new List<Unit>();
         // список входящих сокетов (прием)
-        static List<AcceptConnectionInfo> InConnections = new List<AcceptConnectionInfo>();
+        List<AcceptConnectionInfo> InConnections = new List<AcceptConnectionInfo>();
+
+        string topologyFileName = "topology.json";
+        string idFileName = @"id.txt";
+        string portFileName = @"port.txt";  // возможно потом объединить в 1 файл конфигурации
+
+
+        public void Run() {
+            if (File.Exists(topologyFileName)) {
+                Console.WriteLine("Восстановление топологии");
+
+                GetNeibsFromFile();
+                GetUnitIdFromFile();
+                GetAcceptPortFromFile();
+            }
+            else {
+                Console.WriteLine("Подключение для топологии");
+                GetTopologyFromServer();
+            }
+
+            Console.WriteLine("id: " + Convert.ToString(clientId));
+            Console.WriteLine("port: " + Convert.ToString(acceptPort));
+            Console.WriteLine("Начать?");
+            Console.ReadLine();
+
+            // ПОДКЛЮЧЕНИЕ К СЛЕДУЮЩИМ КЛИЕНТАМ
+            OutConnect();
+
+
+            // ПРОВЕРКА ВХОДЯЩИХ ПОДКЛЮЧЕНИЙ
+            if (!NoAccept()) {
+                Console.WriteLine("Есть входящие подключения");
+                Thread acceptThread = new Thread(Accept);
+                // ПОДКЛЮЧЕНИЕ ВХОДЯЩИХ
+                acceptThread.Start();
+            }
+            else {
+                Console.WriteLine("Входящих подключений нет");
+                //Generation();
+            }
+
+            // ГЕНЕРАЦИЯ ПАКЕТОВ ДАННЫХ
+            Thread generationThread = new Thread(Generation);
+            generationThread.Start();
+
+
+            // ОТПРАВКА ПАКЕТОВ СЛЕДУЮЩИМ КЛИЕНТАМ
+            Thread sendThread = new Thread(Sending);
+            sendThread.Start();
+        }
+
         
-        // добавление принятого пакета в лок память
-        static public void AddToLocMem(byte[] locMem, byte[] buffer) {
+        void AddToLocMem(byte[] locMem, byte[] buffer) {
             int i = 0;
             int j = 0;
             while (locMem[i] != 0) {
                 i++;
             }
-            while(j < buffer.Length) {
+            while (j < buffer.Length) {
                 locMem[i] = buffer[j];
                 i++;
                 j++;
             }
         }
 
-        static int BytesInCollection(byte[] collection) {
+        // TODO: возможно позже поменять на dataInCollection (либо подобное)
+        int BytesInCollection(byte[] collection) {
             int count = 0;
             while (collection[count] != 0) {
                 count++;
             }
             return count;
         }
-
-        static public void CopyFromTo(byte[] bufferFrom, byte[] bufferTO) {
+        void CopyFromTo(byte[] bufferFrom, byte[] bufferTO) {
             for (int i = 0; i < bufferTO.Length; i++) {
                 bufferTO[i] = bufferFrom[i];
             }
         }
-
         
-
-        static bool NoAccept() {
-            foreach(Unit u in Neighbors) {
+        bool NoAccept() {
+            foreach (Unit u in Neighbors) {
                 if (u.priority == -1)
                     return false;
             }
@@ -122,7 +118,7 @@ namespace ClientProject
 
         // ф-я сравнения для сортировки списка по возрастанию (-1, -1... 1, 2...)
         // мб найти другую сортировку ( 1, 2... -1, -1...)
-        static int CompareUnitsByPriority(Unit x, Unit y) {
+        int CompareUnitsByPriority(Unit x, Unit y) {
             if (x.priority == y.priority)
                 return 0;
             if (x.priority < y.priority)
@@ -139,10 +135,8 @@ namespace ClientProject
         //    AddToLocMem(localMemory, buffer);
         //}
 
-        static void Generation()
-        {
-            while (true)
-            {
+        void Generation() {
+            while (true) {
                 Console.WriteLine("Генерация...");
                 Random rnd = new Random();
                 //int time = rnd.Next(3000, 10000);
@@ -150,13 +144,13 @@ namespace ClientProject
                 Thread.Sleep(15000);
                 int data = rnd.Next(1, 100);
                 //int data = Convert.ToInt32(Console.ReadLine());
-                DataPacket packet = new DataPacket(data);
+                DataPacket packet = new DataPacket(data, clientId);
                 byte[] messageBuffer = new byte[1000];
                 DataContractJsonSerializer serializer = new DataContractJsonSerializer(typeof(DataPacket));
-                 MemoryStream stream = new MemoryStream();
-                
- 
-                 serializer.WriteObject(stream, packet);
+                MemoryStream stream = new MemoryStream();
+
+
+                serializer.WriteObject(stream, packet);
 
                 messageBuffer = stream.GetBuffer();    //???
                 stream.Close();
@@ -164,94 +158,102 @@ namespace ClientProject
             }
         }
 
-        static public void AcceptForTopology() {
+        // TODO: посмотреть что общего с методом outconnect (возможно объеденить)
+        void ConnectToServer(out Socket socket) {
             Console.WriteLine("Подключение к серверу для топологии..");
-            Socket serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             //serverSocket.Bind(new IPEndPoint(IPAddress.Any, 660));      // необязательно
-            serverSocket.Connect(serverIp, 999);
+            socket.Connect(serverIp, 999);
+        }
+
+        void GetNeibsFromServer(Socket socket) {
             Console.WriteLine("Прием топологии..");
+            //DataContractJsonSerializer jsonSerializer = new DataContractJsonSerializer(typeof(List<Unit>));
+            byte[] neighborsBuffer = new byte[1000];
+
+            // TODO: разобраться с lock'ом (возможно убрать)
+            lock (locker) {
+                socket.Receive(neighborsBuffer);
+            }
+
+            // нужен чтобы убрать пустой хвост в буфере
+            byte[] streamBuffer = new byte[BytesInCollection(neighborsBuffer)];
+            CopyFromTo(neighborsBuffer, streamBuffer);
+            MemoryStream stream = new MemoryStream(streamBuffer);
             DataContractJsonSerializer jsonSerializer = new DataContractJsonSerializer(typeof(List<Unit>));
-            byte[] receiveBuffer = new byte[1000];
-            byte[] receivePort = new byte[1000];
+            
+            stream.Position = 0;    // необязательно?
+            Neighbors = (List<Unit>)jsonSerializer.ReadObject(stream);
 
+            stream.Close(); // TODO: проверить необходимость закрытия, ведь метод завершается
+        }
+
+        void GetUnitIdFromServer(Socket socket) {
             byte[] receiveId = new byte[1000];
+            lock (locker) {
+                // получение id
+                socket.Receive(receiveId);
 
-            //byte[] receiveId = new byte[4];
 
-            lock (locker)
-            {
-
-                serverSocket.Receive(receiveBuffer);
-
-                serverSocket.Receive(receiveId);
                 byte[] arr = new byte[BytesInCollection(receiveId)];
                 CopyFromTo(receiveId, arr);
                 string strId = Encoding.ASCII.GetString(arr);
                 Console.WriteLine("id:" + strId + "!");
-                myId = Int32.Parse(strId);
-                //serverSocket.Receive(receiveId);
+                clientId = Int32.Parse(strId);
+            }
+        }
 
-                serverSocket.Receive(receivePort);
+        void GetAcceptPortFromServer(Socket socket) {
+            byte[] receivePort = new byte[1000];
+
+            lock (locker) {
+                socket.Receive(receivePort);
                 byte[] arr2 = new byte[BytesInCollection(receivePort)];
                 CopyFromTo(receivePort, arr2);
                 string strPort = Encoding.ASCII.GetString(arr2);
                 Console.WriteLine("port:" + strPort + "!");
-                myAcceptPort = Convert.ToInt32(strPort);
+                acceptPort = Convert.ToInt32(strPort);
             }
-            //string strId = Encoding.ASCII.GetString(receiveId);
-            //myId = Convert.ToInt32(strId);
+        }
 
-            byte[] streamBuffer = new byte[BytesInCollection(receiveBuffer)];
-            CopyFromTo(receiveBuffer, streamBuffer);
-            MemoryStream stream = new MemoryStream(streamBuffer);
-
-            
-            //CreateFile(jsonSerializer.ReadObject(stream));
-
-            //MemoryStream stream = new MemoryStream();
-            //stream.Write(buffer2, 0, buffer2.Length);
-            stream.Position = 0;    // необязательно?
-            Neighbors = (List<Unit>)jsonSerializer.ReadObject(stream);
-
-            //string fileName = Convert.ToString(myId) + "_Unit_Topology.json";
-
-
-            //FileStream fsid = new FileStream("id.json", FileMode.OpenOrCreate);
-            //jsonSerializer.WriteObject(fs, Convert.ToString(myAcceptPort));
-
-
-            //FileStream fsport = new FileStream("Port.json", FileMode.OpenOrCreate);
-            //jsonSerializer.WriteObject(fs, Convert.ToString(myAcceptPort));
-            //fsport.Close();
-
-
-
-
-            //FileStream fs = new FileStream("Topology.json", FileMode.OpenOrCreate);
-            //Neighbors = (List<Unit>)jsonSerializer.ReadObject(fs);
-
-            //fstream.
-
-
-            stream.Close();
-            serverSocket.Close();   // проверить
-            Neighbors.Sort(CompareUnitsByPriority);     // приоритет сортировка по возрастанию (-1, -1... 1, 2...)
-
-            FileStream fstream = new FileStream("topology.json", FileMode.OpenOrCreate);
+        void WriteFiles() {
+            DataContractJsonSerializer jsonSerializer = new DataContractJsonSerializer(typeof(List<Unit>));
+            FileStream fstream = new FileStream(topologyFileName, FileMode.OpenOrCreate);
             jsonSerializer.WriteObject(fstream, Neighbors);
             fstream.Close();
-            FileWriteIdAndPort();
 
+            StreamWriter unitIdFile = new StreamWriter(idFileName);
+            unitIdFile.WriteLine(Convert.ToString(clientId));
+            unitIdFile.Close();
+
+            StreamWriter portFile = new StreamWriter(portFileName);
+            portFile.WriteLine(Convert.ToString(acceptPort));
+            portFile.Close();
+
+        }
+
+        void ShowNeighbours() {
             Console.WriteLine("Полученная топология:");
             foreach (Unit u in Neighbors) {
                 Console.WriteLine(u.ip + ":" + u.acceptPort + ", " + u.priority);
             }
         }
 
-        
+        void GetTopologyFromServer() {
+            ConnectToServer(out Socket serverSocket);
+            GetNeibsFromServer(serverSocket);
+            GetUnitIdFromServer(serverSocket);
+            GetAcceptPortFromServer(serverSocket);
+            serverSocket.Close();
+            Neighbors.Sort(CompareUnitsByPriority); // TODO: посмотреть как работает данный вызов
+            WriteFiles();
+            ShowNeighbours();
+        }
+
+
 
         // подключение к следующим узлам 
-        static public void OutConnect() {
+        void OutConnect() {
             foreach (Unit neighb in Neighbors) {
                 if (neighb.priority > 0) {
                     neighb.socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
@@ -263,10 +265,10 @@ namespace ClientProject
         }
 
         // прием новых подключений и и прослушка от подключившихся
-        static void Accept() {
+        void Accept() {
             Socket listenSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             //listenSocket.Bind(new IPEndPoint(IPAddress.Any, 900));
-            listenSocket.Bind(new IPEndPoint(IPAddress.Any, myAcceptPort));
+            listenSocket.Bind(new IPEndPoint(IPAddress.Any, acceptPort));
             listenSocket.Listen(1);             // у меня аргумент не влиял на размер очереди
             while (true) {
 
@@ -286,7 +288,7 @@ namespace ClientProject
         }
 
         // прием пакетов
-        static void ProcessInConnection(object state) {
+        void ProcessInConnection(object state) {
             AcceptConnectionInfo connection = (AcceptConnectionInfo)state;
             byte[] buffer = new byte[255];
             try {
@@ -316,7 +318,7 @@ namespace ClientProject
         }
 
         // отправка пакетов
-        static void Sending() {
+        void Sending() {
             while (true) {
                 int count = 0;
                 // подсчет инф в памяти
@@ -338,12 +340,9 @@ namespace ClientProject
                                 buffer[i] = localMemory[i];
                             }
 
-                            if (neighb.died)
-                            {
-                                lock (locker)
-                                {
-                                    try
-                                    {
+                            if (neighb.died) {
+                                lock (locker) {
+                                    try {
                                         Console.Write("Попытка восстановить соединение: ");
                                         //neighb.socket.Connect(neighb.ip, neighb.acceptPort);
                                         neighb.socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
@@ -354,13 +353,12 @@ namespace ClientProject
                                         neighb.died = false;
                                         Console.WriteLine("восстановлено");
                                     }
-                                    catch (Exception ex)
-                                    {
+                                    catch (Exception ex) {
                                         Console.WriteLine("не восстановлено");
                                         continue;
                                     }
                                 }
-                        }
+                            }
 
                             try {
                                 neighb.socket.Send(buffer);
@@ -369,7 +367,7 @@ namespace ClientProject
                             // если не удалось отправить - ищем получателя дальше
                             catch (Exception ex) {
                                 //neighb.activity = false;
-                                neighb.died = true ;
+                                neighb.died = true;
                                 //neighb.socket.Shutdown();
                                 Console.WriteLine("Перевод маршрута");
                                 //bestWay++;
@@ -401,39 +399,44 @@ namespace ClientProject
             }
         }
 
-        static void FileWriteIdAndPort()
-        {
-            //FileStream fs = File.Create(@"Id.txt");
-            StreamWriter textFile = new StreamWriter(@"id.txt");
-            textFile.WriteLine(Convert.ToString(myId));
-            textFile.Close();
+        //void FileWriteIdAndPort() {
+        //    //FileStream fs = File.Create(@"Id.txt");
+        //    StreamWriter textFile = new StreamWriter(idFileName);
+        //    textFile.WriteLine(Convert.ToString(myId));
+        //    textFile.Close();
 
-            StreamWriter PortFile = new StreamWriter(@"port.txt");
-            PortFile.WriteLine(Convert.ToString(myAcceptPort));
-            PortFile.Close();
-        }
+        //    StreamWriter PortFile = new StreamWriter(portFileName);
+        //    PortFile.WriteLine(Convert.ToString(myAcceptPort));
+        //    PortFile.Close();
+        //}
 
-        static void LifeUpConnection(){
+        void GetNeibsFromFile() {
             DataContractJsonSerializer jsonSerializer = new DataContractJsonSerializer(typeof(List<Unit>));
-            FileStream fsTopology = new FileStream("topology.json", FileMode.OpenOrCreate);
+            FileStream fsTopology = new FileStream(topologyFileName, FileMode.OpenOrCreate);
             Neighbors = (List<Unit>)jsonSerializer.ReadObject(fsTopology);
             //fsTopology.Close();
+        }
 
-            StreamReader fsId = new StreamReader(@"id.txt");
-            myId = Convert.ToInt32(fsId.ReadLine());
+        void GetUnitIdFromFile() {
+            StreamReader fsId = new StreamReader(idFileName);
+            clientId = Convert.ToInt32(fsId.ReadLine());
             fsId.Close();
-            StreamReader fsPort = new StreamReader(@"port.txt");
-            myAcceptPort = Convert.ToInt32(fsPort.ReadLine());
+        }
+        void GetAcceptPortFromFile() {
+            StreamReader fsPort = new StreamReader(portFileName);
+            acceptPort = Convert.ToInt32(fsPort.ReadLine());
             fsPort.Close();
         }
-
-        static void Main(string[] args) {
-            Console.WriteLine("\tMain Client");
-
-            Client terminal = new Client();
-            terminal.Run();
-
-            Console.ReadLine();
-        }
     }
+
+    // UNIT - класс родитель для клиента и сервера
+    // включает:
+    // метод 
+    //ByteInCollection
+    //CopyFromTo
+    // установка входящего соединения (AcceptConncetion)
+    // процесс приема пакета (ProccessConnection): без распаковки, 
+    //где сервер дальше распаковывает, а клиент добавляет в locmemory и передает дальше
+    // публичный метод Run
+
 }
