@@ -13,7 +13,7 @@ using System.Threading.Tasks;
 namespace ServerProject {
     public class Server {
 
-        const string SERVER_IP = "192.168.1.104";   // TODO: брать ip терминала либо методом, либо вводить при запуске
+        const string SERVER_IP = "192.168.1.106";   // TODO: брать ip терминала либо методом, либо вводить при запуске
         //const string SERVER_IP = "172.20.10.2";
         const int ACCEPT_PORT = 700;
 
@@ -35,7 +35,9 @@ namespace ServerProject {
 
             if (createTopology) {
                 PrintMessage("Формирование топологии");
-                ConnectAllForTopology();
+                PrintMessage("Введите число подключений");
+                int unitsCount = GetConnectionsCount();
+                ConnectAllForTopology(unitsCount);
             }
             PrintMessage("Прием пакетов");
             // прослушку запускаю раньше топологии, тк она отправляется не всем сразу,
@@ -119,7 +121,7 @@ namespace ServerProject {
         }
 
 
-        void ConnectAllForTopology(int clientsCount=1) {
+        void ConnectAllForTopology(int clientsCount = 1) {
 
             // TODO: возможно позже здесь формировать список клиентов и передавать в методы
 
@@ -185,6 +187,12 @@ namespace ServerProject {
                 int id = int.Parse(strId);
                 return id;
             }
+        }
+
+        int GetConnectionsCount() {
+            string strCount = InputData();
+                int count = int.Parse(strCount);
+                return count;
         }
 
         // TODO: Добавить проверку на дурака

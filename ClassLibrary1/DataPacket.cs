@@ -16,11 +16,17 @@ namespace ClientServerLib {
         public int _value;
 
         static int packetCount = 1;
-        public DataPacket(int value, int unitId) {
+        public DataPacket(int unitId) {
             _unitId = unitId;   // раньше unitId не передавался в конструктор, тк использовал id узла напрямую
             _number = packetCount;
-            _value = value;
+            _value = CreateValue();
             packetCount++;
+        }
+
+        int CreateValue() {
+            Random rand = new Random();
+            int value = rand.Next(1, 1000);
+            return value;
         }
     }
 }
