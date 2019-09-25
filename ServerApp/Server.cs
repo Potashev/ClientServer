@@ -1,4 +1,5 @@
-﻿using System;
+﻿using ClientServerLib;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -13,7 +14,7 @@ using System.Threading.Tasks;
 namespace ServerProject {
     public class Server {
 
-        const string SERVER_IP = "192.168.1.106";   // TODO: брать ip терминала либо методом, либо вводить при запуске
+        const string SERVER_IP = "192.168.1.105";   // TODO: брать ip терминала либо методом, либо вводить при запуске
         //const string SERVER_IP = "172.20.10.2";
         const int ACCEPT_PORT = 700;
 
@@ -61,17 +62,26 @@ namespace ServerProject {
                 Connections.Add(connection);
             }
         }
-        
-        DataPacket GetDataFromBuffer(byte[] buffer) {
-            DataContractJsonSerializer serializer = new DataContractJsonSerializer(typeof(DataPacket));
-            DataPacket packet = new DataPacket();
+
+            List<DataPacket> GetDataFromBuffer(byte[] buffer) {
+            DataContractJsonSerializer serializer = new DataContractJsonSerializer(typeof(List<DataPacket>));
+            //DataPacket packet = new DataPacket();
+            List<DataPacket> packet = new List<DataPacket>();
             byte[] streamBuffer = new byte[BytesInCollection(buffer)];
             CopyFromTo(buffer, streamBuffer);
             MemoryStream stream = new MemoryStream(streamBuffer);
             stream.Position = 0;    // необязательно?
-            packet = (DataPacket)serializer.ReadObject(stream);
+            packet = (List<DataPacket>)serializer.ReadObject(stream);
             stream.Close();
             return packet;
+        }
+
+        bool NotEmpty(byte[] buffer) {
+            for(int i=0; i< buffer.Length; i++) {
+                if (buffer[i] != 0)
+                    return true;
+            }
+            return false;
         }
         
         void ProcessConnection(object state) {
@@ -81,13 +91,32 @@ namespace ServerProject {
                 while (true) {
                     int bytesRead = connection.Socket.Receive(buffer);
                     if (bytesRead > 0) {
-                        try {
-                            DataPacket packet = GetDataFromBuffer(buffer);
-                            PrintMessage($"Узел: {packet._unitId}, пакет: {packet._number} , данные: {packet._value}");
+
+                        int startIndex = 0;
+                        //while (NotEmpty(buffer)) {
+                            try {
+                                // TODO: Обрабатывать ситуации, когда в буфере несколько пакетов
+
+
+
+                                // ОСТАНОВИЛСЯ ЗДЕСЬ
+                                PrintMessage("Прием+");
+                            //int size = DataPacket.GetObjectSize();  // TODO: возможно сделать GetBytes.lenght т.к размер буфера считать тоже надо
+                            //byte[] onePacketBuf = new byte[size+1]; // размер буфера с 1 объектом на 2 ьайта больше чем объект в байтах
+                            //Array.Copy(buffer,startIndex, onePacketBuf, size);
+                            //Array.Clear(buffer, startIndex, size+2);
+                            //startIndex += size+2;
+
+                            // TODO: перенести getdatafrom в datapacket как статич
+                                List<DataPacket> packet = GetDataFromBuffer(buffer);
+                                foreach (DataPacket p in packet)
+                                PrintMessage($"Узел: {p._unitId}, пакет: {p._number} , данные: {p._value}");
+                            //PrintMessage(DataPacket.GetObjectSize().ToString()); // 36
                         }
-                        catch (Exception ex) {
-                            continue;
-                        }
+                            catch (Exception ex) {
+                                continue;
+                            }
+                        //}
 
                     }
                     else if (bytesRead == 0) return;
@@ -296,15 +325,15 @@ namespace ServerProject {
         }
     }
 
-    [DataContract]
-    public class DataPacket {
-        [DataMember]
-        public int _unitId;
-        [DataMember]
-        public int _number;
-        [DataMember]
-        public int _value;
-    }
+    //[DataContract]
+    //public class DataPacket {
+    //    [DataMember]
+    //    public int _unitId;
+    //    [DataMember]
+    //    public int _number;
+    //    [DataMember]
+    //    public int _value;
+    //}
 
     // связывает сокет с потоком (надо, если по топологии к серву несколько подключений)
     class ConnectionInfo {

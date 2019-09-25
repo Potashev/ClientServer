@@ -18,18 +18,21 @@ namespace ClientProject {
         // TODO: потом у клиента айпи сервера убрать из кода:
         // либо ввод консоли, либо чтение файла
 
-        string serverIp = "192.168.1.106";
+        string serverIp = "192.168.1.105";
         //string serverIp = "172.20.10.2";
 
 
         int acceptPort;
         int clientId;
 
+        List<DataPacket> packetsForSending = new List<DataPacket>();
         byte[] localMemory = new byte[10000];
 
         List<Unit> Neighbors = new List<Unit>();
         // список входящих сокетов (прием)
         List<AcceptConnectionInfo> InConnections = new List<AcceptConnectionInfo>();
+
+
 
         string topologyFileName = "topology.json";
         string idFileName = @"id.txt";
@@ -138,24 +141,49 @@ namespace ClientProject {
         //}
 
         // TODO: возможно заменить, может добавить метод GetBytes в классе dataPacket
-        byte[] ConvertPacket(DataPacket packet) {
-            DataContractJsonSerializer serializer = new DataContractJsonSerializer(typeof(DataPacket));
-            MemoryStream stream = new MemoryStream();
-            serializer.WriteObject(stream, packet);
-            byte[] bytesPacket = stream.GetBuffer();    //???
-            stream.Close(); // возможно закрытие потока автоматом при завершении метода
-            return bytesPacket;
-        }
+        //byte[] ConvertPacket(DataPacket packet) {
+        //    DataContractJsonSerializer serializer = new DataContractJsonSerializer(typeof(DataPacket));
+        //    MemoryStream stream = new MemoryStream();
+        //    serializer.WriteObject(stream, packet);
+        //    byte[] bytesPacket = stream.GetBuffer();    //???
+        //    stream.Close(); // возможно закрытие потока автоматом при завершении метода
+        //    return bytesPacket;
+        //}
 
         void Generation() {
             while (true) {
                 Console.WriteLine("Генерация...");
                 Thread.Sleep(5000);
                 DataPacket packet = new DataPacket(clientId);
-                byte[] bytesPacket = ConvertPacket(packet);
 
-                AddToLocMem(localMemory, bytesPacket);
+                packetsForSending.Add(packet);
+
+                WriteBytesToLocMem();
+
+
+                //byte[] bytesPacket = ConvertPacket(packet);
+
+
+                //byte[] bytesPacket = DataPacket.GetBytes(list);
+                //AddToLocMem(localMemory, bytesPacket);
+
+                //List<DataPacket> list2 = new List<DataPacket>();
+                //list2.Add(new DataPacket(clientId));
+                //byte[] bytesPacket2 = DataPacket.GetBytes(list2);
+                //AddToLocMem(localMemory, bytesPacket2);
+
+                //DataPacket packet2 = new DataPacket(clientId);
+                ////byte[] bytesPacket = ConvertPacket(packet);
+                //byte[] bytesPacket2 = DataPacket.GetBytes(packet2);
+                //AddToLocMem(localMemory, bytesPacket2);
+
             }
+        }
+
+        void WriteBytesToLocMem() {
+            byte[] bytesPacket = DataPacket.GetBytes(packetsForSending);
+            Array.Clear(localMemory,0,localMemory.Length);
+            AddToLocMem(localMemory, bytesPacket);
         }
 
         // TODO: посмотреть что общего с методом outconnect (возможно объеденить)
@@ -308,6 +336,19 @@ namespace ClientProject {
             }
         }
 
+        // TODO: ВРЕМЕННО - УБРАТЬ!
+        //DataPacket GetDataFromBuffer(byte[] buffer) {
+        //    DataContractJsonSerializer serializer = new DataContractJsonSerializer(typeof(DataPacket));
+        //    DataPacket packet = new DataPacket();
+        //    byte[] streamBuffer = new byte[BytesInCollection(buffer)];
+        //    CopyFromTo(buffer, streamBuffer);
+        //    MemoryStream stream = new MemoryStream(streamBuffer);
+        //    stream.Position = 0;    // необязательно?
+        //    packet = (DataPacket)serializer.ReadObject(stream);
+        //    stream.Close();
+        //    return packet;
+        //}
+
         // прием пакетов
         void ReceivingData(object state) {
             AcceptConnectionInfo connection = (AcceptConnectionInfo)state;
@@ -320,8 +361,14 @@ namespace ClientProject {
                     // или проверить входящие данные на соответствие формату (DataIsChecked())
                     if (bytesRead > 0) {
 
-                        // TODO: убрать из параметра localmem
-                        AddToLocMem(localMemory, buffer);
+                    //DataPacket packet = GetDataFromBuffer(buffer);
+                    //Console.WriteLine($"Узел: {packet._unitId}, пакет: {packet._number} , данные: {packet._value}");
+
+
+                    AddDataToSequence(buffer);
+
+                    //// TODO: убрать из параметра localmem
+                    //AddToLocMem(localMemory, buffer);
                         Console.WriteLine("Прием+");
                     }
                 }
@@ -337,6 +384,24 @@ namespace ClientProject {
             //    //connection.Socket.Close();
             //    InConnections.Remove(connection);
             //}
+        }
+
+        List<DataPacket> GetDataFromBuffer(byte[] buffer) {
+            DataContractJsonSerializer serializer = new DataContractJsonSerializer(typeof(List<DataPacket>));
+            //DataPacket packet = new DataPacket();
+            List<DataPacket> packet = new List<DataPacket>();
+            byte[] streamBuffer = new byte[BytesInCollection(buffer)];
+            CopyFromTo(buffer, streamBuffer);
+            MemoryStream stream = new MemoryStream(streamBuffer);
+            stream.Position = 0;    // необязательно?
+            packet = (List<DataPacket>)serializer.ReadObject(stream);
+            stream.Close();
+            return packet;
+        }
+
+        void AddDataToSequence(byte[] buffer) {
+            List<DataPacket> bufferPackets = GetDataFromBuffer(buffer);
+            packetsForSending.AddRange(bufferPackets);
         }
 
         int GetBytesCountInLocMem() {
@@ -410,6 +475,7 @@ namespace ClientProject {
                                 Console.WriteLine("Передача+");
                                 // TODO: записать номер пакета в файл
                                 Array.Clear(localMemory, 0, dataBytesInLocMemory - 1);
+                                packetsForSending.Clear();
                                 break;
 
                             }
@@ -468,5 +534,6 @@ namespace ClientProject {
     // процесс приема пакета (ProccessConnection): без распаковки, 
     //где сервер дальше распаковывает, а клиент добавляет в locmemory и передает дальше
     // публичный метод Run
+    // метод GetDataFromBuffer (лежит в сервере)
 
 }
