@@ -14,7 +14,7 @@ using System.Threading.Tasks;
 namespace ServerProject {
     public class Server {
 
-        const string SERVER_IP = "192.168.1.105";   // TODO: брать ip терминала либо методом, либо вводить при запуске
+        const string SERVER_IP = "192.168.1.107";   // TODO: брать ip терминала либо методом, либо вводить при запуске
         //const string SERVER_IP = "172.20.10.2";
         const int ACCEPT_PORT = 700;
 

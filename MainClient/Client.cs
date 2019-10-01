@@ -18,7 +18,7 @@ namespace ClientProject {
         // TODO: потом у клиента айпи сервера убрать из кода:
         // либо ввод консоли, либо чтение файла
 
-        string serverIp = "192.168.1.105";
+        string serverIp = "192.168.1.107";
         //string serverIp = "172.20.10.2";
 
 
@@ -42,10 +42,7 @@ namespace ClientProject {
         public void Run() {
             if (File.Exists(topologyFileName)) {
                 Console.WriteLine("Восстановление топологии");
-
-                GetNeibsFromFile();
-                GetUnitIdFromFile();
-                GetAcceptPortFromFile();
+                GetTopologyFromFile();
             }
             else {
                 Console.WriteLine("Подключение для топологии");
@@ -83,6 +80,12 @@ namespace ClientProject {
             // ОТПРАВКА ПАКЕТОВ СЛЕДУЮЩИМ КЛИЕНТАМ
             Thread sendThread = new Thread(Sending);
             sendThread.Start();
+        }
+
+        void GetTopologyFromFile() {
+            GetNeibsFromFile();
+            GetUnitIdFromFile();
+            GetAcceptPortFromFile();
         }
 
         
@@ -155,11 +158,8 @@ namespace ClientProject {
                 Console.WriteLine("Генерация...");
                 Thread.Sleep(5000);
                 DataPacket packet = new DataPacket(clientId);
-
                 packetsForSending.Add(packet);
-
-                WriteBytesToLocMem();
-
+                //WriteBytesToLocMem();
 
                 //byte[] bytesPacket = ConvertPacket(packet);
 
@@ -180,11 +180,11 @@ namespace ClientProject {
             }
         }
 
-        void WriteBytesToLocMem() {
-            byte[] bytesPacket = DataPacket.GetBytes(packetsForSending);
-            Array.Clear(localMemory,0,localMemory.Length);
-            AddToLocMem(localMemory, bytesPacket);
-        }
+        //void WriteBytesToLocMem() {
+        //    byte[] bytesPacket = DataPacket.GetBytes(packetsForSending);
+        //    Array.Clear(localMemory,0,localMemory.Length);
+        //    AddToLocMem(localMemory, bytesPacket);
+        //}
 
         // TODO: посмотреть что общего с методом outconnect (возможно объеденить)
         void ConnectToServer(out Socket socket) {
@@ -365,7 +365,7 @@ namespace ClientProject {
                     //Console.WriteLine($"Узел: {packet._unitId}, пакет: {packet._number} , данные: {packet._value}");
 
 
-                    AddDataToSequence(buffer);
+                    AddDataForSending(buffer);
 
                     //// TODO: убрать из параметра localmem
                     //AddToLocMem(localMemory, buffer);
@@ -399,7 +399,7 @@ namespace ClientProject {
             return packet;
         }
 
-        void AddDataToSequence(byte[] buffer) {
+        void AddDataForSending(byte[] buffer) {
             List<DataPacket> bufferPackets = GetDataFromBuffer(buffer);
             packetsForSending.AddRange(bufferPackets);
         }
@@ -412,10 +412,12 @@ namespace ClientProject {
             return bytesCount;
         }
 
-        byte[] GetBufferForSending(int bufferSize) {
-            byte[] buffer = new byte[bufferSize];
-            CopyFromTo(localMemory, buffer);
-            return buffer;
+        byte[] GetBufferForSending(/*int bufferSize*/) {
+            //byte[] buffer = new byte[bufferSize];
+            //CopyFromTo(localMemory, buffer);
+
+            byte[] bytesPacket = DataPacket.GetBytes(packetsForSending);
+            return bytesPacket;
         }
 
         void TryLifeUpConnection(Unit neighbour, out bool successLifeUp) {
@@ -424,7 +426,6 @@ namespace ClientProject {
                     //Console.Write("Попытка восстановить соединение: ");
                     neighbour.socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
                     neighbour.socket.Connect(neighbour.ip, neighbour.acceptPort);
-                    neighbour.died = false;
                     //Console.WriteLine("восстановлено");
                     successLifeUp = true;
                 }
@@ -442,10 +443,8 @@ namespace ClientProject {
             }
             catch (Exception ex) {
                 //neighb.activity = false;
-                neighbour.died = true;
                 successSend = false;
                 //neighb.socket.Shutdown();
-                Console.WriteLine("Перевод маршрута");
             }
         }
 
@@ -453,9 +452,10 @@ namespace ClientProject {
         void Sending() {
             // TODO: возможно убрать ВСЕ циклы while(true) и попроб заменить на события
             while (true) {
-                int dataBytesInLocMemory = GetBytesCountInLocMem();
-                if (dataBytesInLocMemory > 0) {
-                    byte[] sendBuffer = GetBufferForSending(dataBytesInLocMemory);
+                //int dataBytesInLocMemory = GetBytesCountInLocMem();
+                //if (dataBytesInLocMemory > 0) {
+                if (packetsForSending.Count > 0) {
+                    byte[] sendBuffer = GetBufferForSending(/*dataBytesInLocMemory*/);
                     bool successSend = false;
                     foreach (Unit neighb in Neighbors) {
                         if (neighb.priority > 0) {
@@ -464,6 +464,7 @@ namespace ClientProject {
                                 TryLifeUpConnection(neighb, out bool successLifeUp);
                                 if (successLifeUp) {
                                     Console.WriteLine("восстановлено");
+                                    neighb.died = false;
                                 }
                                 else {
                                     Console.WriteLine("не восстановлено");
@@ -474,13 +475,14 @@ namespace ClientProject {
                             if (successSend) {
                                 Console.WriteLine("Передача+");
                                 // TODO: записать номер пакета в файл
-                                Array.Clear(localMemory, 0, dataBytesInLocMemory - 1);
+                                //Array.Clear(localMemory, 0, dataBytesInLocMemory - 1);
                                 packetsForSending.Clear();
                                 break;
 
                             }
                             else {
                                 Console.WriteLine("Перевод маршрута");
+                                neighb.died = true;
                                 continue;
                             }
                         }
