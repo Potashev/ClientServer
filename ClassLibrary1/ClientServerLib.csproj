@@ -44,8 +44,9 @@
   <ItemGroup>
     <Compile Include="AcceptConnectionInfo.cs" />
     <Compile Include="DataPacket.cs" />
+    <Compile Include="Node.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Unit.cs" />
+    <Compile Include="Neighbour.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

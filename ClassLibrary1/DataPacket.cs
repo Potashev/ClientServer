@@ -81,5 +81,11 @@ namespace ClientServerLib {
             int value = rand.Next(1, 1000);
             return value;
         }
+
+        public string GetInfo() {
+            string packetInfo = $"Узел: {_unitId}, пакет: {_number} , данные: {_value}";
+            return packetInfo;
+
+        }
     }
 }

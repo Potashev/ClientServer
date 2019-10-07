@@ -10,7 +10,7 @@ namespace ClientServerLib {
     // соседи узла в топологии
     // TODO: переименовать в соседа (neib..)?
     [DataContract]
-    public class Unit {
+    public class Neighbour {
         [DataMember]
         public string ip;
         [DataMember]
@@ -22,7 +22,7 @@ namespace ClientServerLib {
 
         public bool died;       // нужны только у узлов отправки
 
-        public Unit(string addr, int weight, int port) {
+        public Neighbour(string addr, int weight, int port) {
             ip = addr;
             priority = weight;
 

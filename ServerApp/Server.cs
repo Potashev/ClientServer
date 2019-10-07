@@ -12,11 +12,12 @@ using System.Threading;
 using System.Threading.Tasks;
 
 namespace ServerProject {
-    public class Server {
+    public class Server: Node {
 
-        const string SERVER_IP = "192.168.1.107";   // TODO: брать ip терминала либо методом, либо вводить при запуске
+        //const string SERVER_IP = "192.168.1.107";   // TODO: брать ip терминала либо методом, либо вводить при запуске
         //const string SERVER_IP = "172.20.10.2";
-        const int ACCEPT_PORT = 700;
+        
+        const int SERVER_ACCEPT_PORT = 700;
 
         static object locker = new object();    // TODO: попробовать перенести locker в SendNeibs
 
@@ -30,6 +31,8 @@ namespace ServerProject {
         public Server(inputData userInput, outputData userOutput) {
             input = userInput;
             output = userOutput;
+
+            AcceptPort = SERVER_ACCEPT_PORT;
         }
 
         public void Run(bool createTopology) {
@@ -48,34 +51,6 @@ namespace ServerProject {
             acceptThread.Start();
         }
 
-        void AcceptConnections() {
-            Socket serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            serverSocket.Bind(new IPEndPoint(IPAddress.Any, ACCEPT_PORT));
-            serverSocket.Listen(1);             // аргумент не влияет?
-            while (true) {
-                Socket socket = serverSocket.Accept();
-                ConnectionInfo connection = new ConnectionInfo();
-                connection.Socket = socket;
-                connection.Thread = new Thread(ProcessConnection);
-                connection.Thread.IsBackground = true;
-                connection.Thread.Start(connection);
-                Connections.Add(connection);
-            }
-        }
-
-            List<DataPacket> GetDataFromBuffer(byte[] buffer) {
-            DataContractJsonSerializer serializer = new DataContractJsonSerializer(typeof(List<DataPacket>));
-            //DataPacket packet = new DataPacket();
-            List<DataPacket> packet = new List<DataPacket>();
-            byte[] streamBuffer = new byte[BytesInCollection(buffer)];
-            CopyFromTo(buffer, streamBuffer);
-            MemoryStream stream = new MemoryStream(streamBuffer);
-            stream.Position = 0;    // необязательно?
-            packet = (List<DataPacket>)serializer.ReadObject(stream);
-            stream.Close();
-            return packet;
-        }
-
         bool NotEmpty(byte[] buffer) {
             for(int i=0; i< buffer.Length; i++) {
                 if (buffer[i] != 0)
@@ -84,70 +59,57 @@ namespace ServerProject {
             return false;
         }
         
-        void ProcessConnection(object state) {
-            ConnectionInfo connection = (ConnectionInfo)state;
-            byte[] buffer = new byte[255];
-            try {
-                while (true) {
-                    int bytesRead = connection.Socket.Receive(buffer);
-                    if (bytesRead > 0) {
+        //void ProcessConnection(object state) {
+        //    ConnectionInfo connection = (ConnectionInfo)state;
+        //    byte[] buffer = new byte[255];
+        //    try {
+        //        while (true) {
+        //            int bytesRead = connection.Socket.Receive(buffer);
+        //            if (bytesRead > 0) {
 
-                        int startIndex = 0;
-                        //while (NotEmpty(buffer)) {
-                            try {
-                                // TODO: Обрабатывать ситуации, когда в буфере несколько пакетов
+        //                int startIndex = 0;
+        //                //while (NotEmpty(buffer)) {
+        //                    try {
+        //                        // TODO: Обрабатывать ситуации, когда в буфере несколько пакетов
 
 
 
-                                // ОСТАНОВИЛСЯ ЗДЕСЬ
-                                PrintMessage("Прием+");
-                            //int size = DataPacket.GetObjectSize();  // TODO: возможно сделать GetBytes.lenght т.к размер буфера считать тоже надо
-                            //byte[] onePacketBuf = new byte[size+1]; // размер буфера с 1 объектом на 2 ьайта больше чем объект в байтах
-                            //Array.Copy(buffer,startIndex, onePacketBuf, size);
-                            //Array.Clear(buffer, startIndex, size+2);
-                            //startIndex += size+2;
+        //                        // ОСТАНОВИЛСЯ ЗДЕСЬ
+        //                        PrintMessage("Прием+");
+        //                    //int size = DataPacket.GetObjectSize();  // TODO: возможно сделать GetBytes.lenght т.к размер буфера считать тоже надо
+        //                    //byte[] onePacketBuf = new byte[size+1]; // размер буфера с 1 объектом на 2 ьайта больше чем объект в байтах
+        //                    //Array.Copy(buffer,startIndex, onePacketBuf, size);
+        //                    //Array.Clear(buffer, startIndex, size+2);
+        //                    //startIndex += size+2;
 
-                            // TODO: перенести getdatafrom в datapacket как статич
-                                List<DataPacket> packet = GetDataFromBuffer(buffer);
-                                foreach (DataPacket p in packet)
-                                PrintMessage($"Узел: {p._unitId}, пакет: {p._number} , данные: {p._value}");
-                            //PrintMessage(DataPacket.GetObjectSize().ToString()); // 36
-                        }
-                            catch (Exception ex) {
-                                continue;
-                            }
-                        //}
+        //                    // TODO: перенести getdatafrom в datapacket как статич
+        //                        List<DataPacket> packet = GetDataFromBuffer(buffer);
+        //                        foreach (DataPacket p in packet)
+        //                        PrintMessage(p.GetInfo());
+        //                    //PrintMessage(DataPacket.GetObjectSize().ToString()); // 36
+        //                }
+        //                    catch (Exception ex) {
+        //                        continue;
+        //                    }
+        //                //}
 
-                    }
-                    else if (bytesRead == 0) return;
-                }
-            }
-            catch (SocketException exc) {
-                Console.WriteLine("Socket exception: " +
-                    exc.SocketErrorCode);
-            }
-            catch (Exception exc) {
-                Console.WriteLine("Exception: " + exc);
-            }
-            finally {
-                connection.Socket.Close();
-                lock (Connections) Connections.Remove(
-                    connection);
-            }
-        }
-
-        int BytesInCollection(byte[] collection) {
-            int count = 0;
-            while (collection[count] != 0) {
-                count++;
-            }
-            return count;
-        }
-        void CopyFromTo(byte[] bufferFrom, byte[] bufferTO) {
-            for (int i = 0; i < bufferTO.Length; i++) {
-                bufferTO[i] = bufferFrom[i];
-            }
-        }
+        //            }
+        //            else if (bytesRead == 0) return;
+        //        }
+        //    }
+        //    catch (SocketException exc) {
+        //        Console.WriteLine("Socket exception: " +
+        //            exc.SocketErrorCode);
+        //    }
+        //    catch (Exception exc) {
+        //        Console.WriteLine("Exception: " + exc);
+        //    }
+        //    finally {
+        //        connection.Socket.Close();
+        //        lock (Connections) Connections.Remove(
+        //            connection);
+        //    }
+        //}
 
 
         void ConnectAllForTopology(int clientsCount = 1) {
@@ -184,7 +146,7 @@ namespace ServerProject {
         void CreateTopology(List<Client> clients) {
             ShowClients(clients);
             foreach (Client client in clients) {
-                List<Unit> Neibs = GetNeibsForClient(client, clients);
+                List<Neighbour> Neibs = GetNeibsForClient(client, clients);
                 ConvertNeibsForSending(Neibs, out byte[] buffer);
                 Neibs.Clear();
                 SendNeibs(client, buffer);
@@ -193,7 +155,7 @@ namespace ServerProject {
         }
 
         void ShowClients (List<Client> clients){
-            PrintMessage("Список клиентов:");
+            PrintMessage("Узлы топологии:");
             string ip;
             int id;
             foreach (Client cl in clients) {
@@ -206,7 +168,7 @@ namespace ServerProject {
 
         
         // TODO: Добавить проверку на дурака
-        int? GetNeibId() {
+        int? InputNeibId() {
             PrintMessage("Id:");
             string strId = InputData();
             if (strId == "") {
@@ -231,33 +193,40 @@ namespace ServerProject {
             return priority;
         }
 
-        List<Unit> GetNeibsForClient(Client client, List<Client> clients) {
+        List<Neighbour> GetNeibsForClient(Client client, List<Client> clients) {
 
             string clientIp = client.GetIpPort();
             int clientId = client._id;
             PrintMessage($"Для узла {clientIp} (id = {clientId}):");
-            List<Unit> neibs = new List<Unit>();
+            List<Neighbour> neibs = new List<Neighbour>();
             while (true) {
-                int? id = GetNeibId();
+                int? id = InputNeibId();
                 // проверка значения id на выход из цикла
                 
                 if(id == null) {
                     break;
                 }
 
-                foreach(Client cl in clients) {
+                if (id == 0) {
+                    //Unit NeibServer = new Unit(SERVER_IP, 1, ACCEPT_PORT);
+                    Neighbour NeibServer = new Neighbour(SERVER_IP, 1, AcceptPort);
+                    neibs.Add(NeibServer);
+                    continue;
+                }
 
-                    if (id == 0) {
-                        Unit NeibServer = new Unit(SERVER_IP, 1, ACCEPT_PORT);
-                        neibs.Add(NeibServer);
-                        continue;
-                    }
+                foreach (Client cl in clients) {
+                   
+                    //    if (id == 0) {
+                    //    Unit NeibServer = new Unit(SERVER_IP, 1, ACCEPT_PORT);
+                    //    neibs.Add(NeibServer);
+                    //    continue;
+                    //}
 
                     if (cl._id == id) {
                        int priority = GetNeibPriority();
                         string ip = cl.GetIp();
                         int port = cl._acceptPort;
-                        Unit n = new Unit(ip, priority, port);
+                        Neighbour n = new Neighbour(ip, priority, port);
                         neibs.Add(n);
                         break;
                     }
@@ -275,15 +244,16 @@ namespace ServerProject {
 
                 string clientId = Convert.ToString(client._id);
                 client._socket.Send(Encoding.ASCII.GetBytes(clientId));
+                // TODO: убрать либо сделать меньше
                 Thread.Sleep(2000);
                 string clientAcceptPort = Convert.ToString(client._acceptPort);
                 client._socket.Send(Encoding.ASCII.GetBytes(clientAcceptPort));
             }
         }
 
-        void ConvertNeibsForSending(List<Unit> neibs, out byte[] buffer) {
+        void ConvertNeibsForSending(List<Neighbour> neibs, out byte[] buffer) {
             buffer = new byte[1000];
-            DataContractJsonSerializer jsonSerializer = new DataContractJsonSerializer(typeof(List<Unit>));
+            DataContractJsonSerializer jsonSerializer = new DataContractJsonSerializer(typeof(List<Neighbour>));
             MemoryStream stream = new MemoryStream();
             jsonSerializer.WriteObject(stream, neibs);
             //Neibs.Clear();
@@ -307,33 +277,6 @@ namespace ServerProject {
             return input();
         }
     }
-
-    // узел - задаем и отправляем при вводе топологии 
-    [DataContract]
-    public class Unit {
-        [DataMember]
-        public string ip;
-        [DataMember]
-        public int priority;        // пока >0 - отправка (с приоритетом), -1 - прием
-        [DataMember]
-        public int acceptPort;
-
-        public Unit(string addr, int weight, int port) {
-            ip = addr;
-            priority = weight;
-            acceptPort = port;
-        }
-    }
-
-    //[DataContract]
-    //public class DataPacket {
-    //    [DataMember]
-    //    public int _unitId;
-    //    [DataMember]
-    //    public int _number;
-    //    [DataMember]
-    //    public int _value;
-    //}
 
     // связывает сокет с потоком (надо, если по топологии к серву несколько подключений)
     class ConnectionInfo {
