@@ -14,28 +14,17 @@ using System.Threading.Tasks;
 namespace ServerProject {
     public class Server: Node {
 
-        //const string SERVER_IP = "192.168.1.107";   // TODO: брать ip терминала либо методом, либо вводить при запуске
-        //const string SERVER_IP = "172.20.10.2";
-        
-        const int SERVER_ACCEPT_PORT = 700;
+        //static object locker = new object();    // TODO: попробовать перенести locker в SendNeibs
+        bool createTopology;
 
-        static object locker = new object();    // TODO: попробовать перенести locker в SendNeibs
+        public Server(InputDelegate userInput, OutputDelegate userOutput, int acceptPort, bool createTopology = false) : base(userInput, userOutput) {
 
-        public delegate string inputData();
-        inputData input;
-        public delegate void outputData(string message);
-        outputData output;
-        
-        List<ConnectionInfo> Connections = new List<ConnectionInfo>();
-
-        public Server(inputData userInput, outputData userOutput) {
-            input = userInput;
-            output = userOutput;
-
-            AcceptPort = SERVER_ACCEPT_PORT;
+            AcceptPort = acceptPort;
+            serverNode = true;
+            this.createTopology = createTopology;
         }
 
-        public void Run(bool createTopology) {
+        public override void Run() {
 
             if (createTopology) {
                 PrintMessage("Формирование топологии");
@@ -43,12 +32,25 @@ namespace ServerProject {
                 int unitsCount = GetConnectionsCount();
                 ConnectAllForTopology(unitsCount);
             }
-            PrintMessage("Прием пакетов");
-            // прослушку запускаю раньше топологии, тк она отправляется не всем сразу,
-            // а каждому, сразу после ввода, если клиентов несколько, начнутся проблемы
 
-            Thread acceptThread = new Thread(AcceptConnections);
-            acceptThread.Start();
+
+            //List<byte[]> messageList = new List<byte[]>();
+            //messageList.Add(new byte[4]);
+            //messageList.Add(new byte[2]);
+            //var res = GetResultBuffer(messageList);
+            //Console.WriteLine(res.Length);
+            //Console.ReadKey();
+
+
+            PrintMessage("Прием пакетов...");
+            //AcceptConnections();
+
+            ReceivingProccess();
+            
+
+
+            //Thread acceptThread = new Thread(AcceptConnections);
+            //acceptThread.Start();
         }
 
         bool NotEmpty(byte[] buffer) {
@@ -112,7 +114,7 @@ namespace ServerProject {
         //}
 
 
-        void ConnectAllForTopology(int clientsCount = 1) {
+        void ConnectAllForTopology(int clientsCount) {
 
             // TODO: возможно позже здесь формировать список клиентов и передавать в методы
 
@@ -125,9 +127,13 @@ namespace ServerProject {
         }
 
         void OpenConnectForTopology(int clientsCount, List<Client> clients) {
-            Socket serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            serverSocket.Bind(new IPEndPoint(IPAddress.Any, 999));
-            serverSocket.Listen(1);
+            //Socket serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            //serverSocket.Bind(new IPEndPoint(IPAddress.Any, SERVER_PORT_FOR_TOPOLOGY));
+            //serverSocket.Listen(1);
+
+
+            RunAcceptSocket(SERVER_PORT_FOR_TOPOLOGY, out Socket serverSocket);
+
             PrintMessage($"Ожидаемое число подключений: {clientsCount}");
             PrintMessage("Ожидание подключений...");
             for (int i = 0; i < clientsCount; i++) {
@@ -138,8 +144,11 @@ namespace ServerProject {
             }
             PrintMessage("Все подключились");
 
-            //serverSocket.Shutdown(SocketShutdown.Both);
-            serverSocket.Close();
+            ////serverSocket.Shutdown(SocketShutdown.Both);
+            //serverSocket.Close();
+
+            CloseSocket(serverSocket);
+
 
         }
 
@@ -188,7 +197,7 @@ namespace ServerProject {
 
         // TODO: Добавить проверку на дурака
         int GetNeibPriority() {
-            PrintMessage("Priority:");
+            PrintMessage("Приоритет:");
             int priority = int.Parse(InputData());
             return priority;
         }
@@ -201,26 +210,19 @@ namespace ServerProject {
             List<Neighbour> neibs = new List<Neighbour>();
             while (true) {
                 int? id = InputNeibId();
+
                 // проверка значения id на выход из цикла
-                
                 if(id == null) {
                     break;
                 }
 
                 if (id == 0) {
-                    //Unit NeibServer = new Unit(SERVER_IP, 1, ACCEPT_PORT);
                     Neighbour NeibServer = new Neighbour(SERVER_IP, 1, AcceptPort);
                     neibs.Add(NeibServer);
                     continue;
                 }
 
                 foreach (Client cl in clients) {
-                   
-                    //    if (id == 0) {
-                    //    Unit NeibServer = new Unit(SERVER_IP, 1, ACCEPT_PORT);
-                    //    neibs.Add(NeibServer);
-                    //    continue;
-                    //}
 
                     if (cl._id == id) {
                        int priority = GetNeibPriority();
@@ -245,7 +247,7 @@ namespace ServerProject {
                 string clientId = Convert.ToString(client._id);
                 client._socket.Send(Encoding.ASCII.GetBytes(clientId));
                 // TODO: убрать либо сделать меньше
-                Thread.Sleep(2000);
+                Thread.Sleep(100);
                 string clientAcceptPort = Convert.ToString(client._acceptPort);
                 client._socket.Send(Encoding.ASCII.GetBytes(clientAcceptPort));
             }
@@ -263,25 +265,11 @@ namespace ServerProject {
 
         void CloseConnectionForTopology(List<Client> clients) {
             foreach (Client cl in clients) {
-                //cl._socket.Shutdown((SocketShutdown.Both));
-                cl._socket.Close();
+                ////cl._socket.Shutdown((SocketShutdown.Both));
+                //cl._socket.Close();
+                CloseSocket(cl._socket);
             }
         }
-
-        void PrintMessage(string message) {
-            output(message);
-        }
-
-        // TODO: возможно функцию убрать и вызывать делегат
-        string InputData() {
-            return input();
-        }
-    }
-
-    // связывает сокет с потоком (надо, если по топологии к серву несколько подключений)
-    class ConnectionInfo {
-        public Socket Socket;
-        public Thread Thread;
     }
 
     class Client {

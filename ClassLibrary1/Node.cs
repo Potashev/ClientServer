@@ -10,37 +10,77 @@ using System.Threading;
 using System.Threading.Tasks;
 
 namespace ClientServerLib {
-    public class Node {
+    public abstract class Node {
 
         protected const string SERVER_IP = "192.168.1.107";
+        protected const int SERVER_PORT_FOR_TOPOLOGY = 999;
+
+        //protected const int SERVER_ACCEPT_PORT = 
+
+        // решение (возможно временное) определения сервера в node
+        protected bool serverNode;
 
 
 
-        protected IPAddress ip { get; set; }
+        protected IPAddress Ip { get; set; }
         protected int AcceptPort { get; set; }
 
 
         protected List<AcceptConnectionInfo> InConnections = new List<AcceptConnectionInfo>();
         protected List<DataPacket> packetsSequence = new List<DataPacket>();
 
+        // TODO: проверить readonly
+        
+        protected readonly InputDelegate input;
+        protected readonly OutputDelegate output;
 
-        public void Run() { }
+        static protected object locker = new object();    // TODO: попробовать перенести locker в SendNeibs
+
+        protected Node(InputDelegate userInput, OutputDelegate userOutput) {
+            input = userInput;
+            output = userOutput;
+
+            Ip = GetIpAdress();
+
+        }
+
+        // TODO: возможно полсе найти другой вариант
+        IPAddress GetIpAdress() {
+            string s = Dns.GetHostName();
+            IPHostEntry ipEntry = Dns.GetHostByName(Dns.GetHostName());
+            IPAddress[] addr = ipEntry.AddressList;
+            return addr[0];
+        }
+
+        // TODO: возможно вместо виртуально сервера добавить интерфейс с Run()
+        public virtual void Run() { }
+
+        
 
         protected void AcceptConnections() {
-            RunListenSoket(out Socket acceptSocket);
+            RunAcceptSocket(AcceptPort, out Socket listenSocket);
             while (true) {
-                Socket socket = acceptSocket.Accept();
-                Console.WriteLine("Новое подключение");
+                Socket acceptedSocket = listenSocket.Accept();
+                PrintMessage("Новое подключение");
 
-                RunAcceptedConnection(socket);
+                RunAcceptedConnection(acceptedSocket);
             }
         }
 
-        protected void RunListenSoket(out Socket listenSocket) {
-            listenSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            listenSocket.Bind(new IPEndPoint(IPAddress.Any, AcceptPort));
-            listenSocket.Listen(1);             // у меня аргумент не влиял на размер очереди
+        static protected void RunAcceptSocket(int acceptPort, out Socket acceptSocket) {
+            acceptSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            acceptSocket.Bind(new IPEndPoint(IPAddress.Any, acceptPort));
+            acceptSocket.Listen(1);             // у меня аргумент не влиял на размер очереди
         }
+
+        static protected void CloseSocket(Socket socket) {
+            // TODO: разобраться почему на shutdown ловлю исключение
+            // (возможно связано с тем, что shutdown вызываю с обоих сторон)
+
+            //socket.Shutdown(SocketShutdown.Both);
+            socket.Close();
+        }
+
         protected void RunAcceptedConnection(Socket socket) {
             AcceptConnectionInfo connection = new AcceptConnectionInfo();
             connection.Socket = socket;
@@ -50,9 +90,62 @@ namespace ClientServerLib {
             connection.Thread.Start(connection);
         }
 
+        protected void ReceivingProccess() {
+            Socket acceptSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            //acceptSocket.Bind(new IPEndPoint(IPAddress.Parse(SERVER_IP), 700));
+            acceptSocket.Bind(new IPEndPoint(Ip, AcceptPort));
+            acceptSocket.Listen(1); // здесь параметр будет число соседов сервера по топологии (в теории)
+
+            while (true) {
+                var listener = acceptSocket.Accept();
+                var buffer = new byte[1000];
+                List<byte[]> messageList = new List<byte[]>();  // содержит все куски сообщения
+                //var acumBuffer = new byte[10000];
+                var size = 0;
+                //var messageSize = 0;
+                //var data = new StringBuilder();
+
+                // РАБОТАЕТ ЕСЛИ СООБЩЕНИЕ 1 КУСКОМ (1 ИТЕРАЦИЯ ЦИКЛА)
+                do {
+                    size = listener.Receive(buffer);
+                    //messageList.Add(buffer);
+
+                } while (listener.Available > 0);
+                listener.Shutdown(SocketShutdown.Both);
+                listener.Close();
+
+                //byte[] resultbytes = GetResultBuffer(messageList);
+
+                List<DataPacket> receivedPackets = GetDataFromBuffer(buffer);
+                packetsSequence.AddRange(receivedPackets);
+
+                if (serverNode) {
+                    foreach (DataPacket p in receivedPackets)
+                        PrintMessage(p.GetInfo());
+                }
+
+            }
+        }
+
+        protected byte[] GetResultBuffer(List<byte[]> msgList) {
+            int size = 0;
+            foreach(byte[] b in msgList) {
+                size += b.Length;
+            }
+            byte[] resBuf = new byte[size];
+            int index = 0;
+            foreach(byte[] b in msgList) {
+                Array.Copy(b, 0, resBuf, index,b.Length);
+                index += b.Length;
+            }
+            return resBuf;
+        }
+
         protected void ReceivingData(object state) {
             AcceptConnectionInfo connection = (AcceptConnectionInfo)state;
             byte[] buffer = new byte[255];
+
+            // TODO: сравнить с возможным вариантом перенести try под while
             try {
                 while (true) {
                 int bytesRead = connection.Socket.Receive(buffer);
@@ -63,26 +156,23 @@ namespace ClientServerLib {
 
                     List<DataPacket> receivedPackets = GetDataFromBuffer(buffer);
                     packetsSequence.AddRange(receivedPackets);
-
-
-
-                    // КОСТЫЛЬ ДЛЯ ОПРЕДЕЛЕНИЯ СЕРВЕРА
-                    if (AcceptPort == 700) {
+                        
+                    if (serverNode) {
                         foreach (DataPacket p in receivedPackets)
-                            Console.WriteLine(p.GetInfo());
+                                PrintMessage(p.GetInfo());
                     }
 
-                    Console.WriteLine("Прием+");
+                        PrintMessage("Прием+");
                 }
             }
             }
             catch (SocketException exc) {
 
-                Console.WriteLine("Socket exception: " +
+                PrintMessage("Socket exception: " +
                     exc.SocketErrorCode);
             }
             catch (Exception exc) {
-                Console.WriteLine("Exception: " + exc);
+                PrintMessage("Exception: " + exc);
             }
             finally {
                 //connection.Socket.Close();
@@ -112,14 +202,25 @@ namespace ClientServerLib {
             }
             return count;
         }
-        protected void CopyFromTo(byte[] bufferFrom, byte[] bufferTO) {
-            for (int i = 0; i < bufferTO.Length; i++) {
-                bufferTO[i] = bufferFrom[i];
+        protected void CopyFromTo(byte[] bufferFrom, byte[] bufferTo) {
+            for (int i = 0; i < bufferTo.Length; i++) {
+                bufferTo[i] = bufferFrom[i];
             }
         }
 
+        protected void PrintMessage(string message) {
+            output(message); 
+        }
+        // TODO: возможно функцию убрать и вызывать делегат
+        protected string InputData() {
+            return input();
+        }
 
     }
+
+    public delegate string InputDelegate();
+    public delegate void OutputDelegate(string message);
+
 }
 
 // NODE - класс родитель для клиента и сервера
@@ -129,13 +230,18 @@ namespace ClientServerLib {
 // + CopyFromTo
 // + установка входящего соединения (AcceptConncetion)
 // + процесс приема пакета
-// публичный метод Run  (виртуальный либо абстрактный?)
+// + публичный метод Run  (виртуальный либо абстрактный?)
 // + метод GetDataFromBuffer
 
 //RUNTIME EXCEPTIONS:
 // +  1) клиент: при отвале входящего подключения
+// 2) узел (отвал сервера): периодическая ошибка десериализации( выше при высокой скорости генерации или передачи нескольких пакетов)
+// связано (скорей всего) с некоректной сериализацией на клиенте
 
 // ПОМЕНЯТЬ ПОСЛЕ:
 // 1) работать с ip адресами не как строки а как класс IPAddress
+// 2) возможно, связать идею работы с файлами, т.е не методы записи и чтения, а формат работы с файлами(в каком виде они будут)
+// (может сделать это через отдельный класс работы с файлами на уровне node)
+// 3) посмотреть правильное закрытие сокета. если не 1 строчка .close, тогда все брать из метода closesocket в node
 
 //ПОДПРАВИТЬ:
