@@ -22,6 +22,14 @@ namespace ServerProject {
             AcceptPort = acceptPort;
             serverNode = true;
             this.createTopology = createTopology;
+
+            PacketSequenceAdded += PrintNewPackets;
+
+        }
+
+        void PrintNewPackets(List<DataPacket> packets) {
+                foreach (DataPacket p in packets)
+                    PrintMessage(p.GetInfo());
         }
 
         public override void Run() {

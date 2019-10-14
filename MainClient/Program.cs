@@ -17,8 +17,9 @@ namespace ClientProject
 
         static void Main(string[] args) {
             Console.WriteLine("\tClient");
-
-            Client terminal = new Client(Console.ReadLine, Console.WriteLine);
+            Console.Write("Время генерации пакета: ");
+            int time =int.Parse(Console.ReadLine());
+            Client terminal = new Client(Console.ReadLine, Console.WriteLine, time);
             terminal.Run();
         }
     }

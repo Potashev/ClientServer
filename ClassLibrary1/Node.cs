@@ -56,7 +56,7 @@ namespace ClientServerLib {
         public virtual void Run() { }
 
         
-
+        // TODO: - рудимент
         protected void AcceptConnections() {
             RunAcceptSocket(AcceptPort, out Socket listenSocket);
             while (true) {
@@ -90,6 +90,9 @@ namespace ClientServerLib {
             connection.Thread.Start(connection);
         }
 
+        public delegate void PacketSequenceState(List<DataPacket> addedPackets);
+        public event PacketSequenceState PacketSequenceAdded;
+
         protected void ReceivingProccess() {
             Socket acceptSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             //acceptSocket.Bind(new IPEndPoint(IPAddress.Parse(SERVER_IP), 700));
@@ -119,10 +122,14 @@ namespace ClientServerLib {
                 List<DataPacket> receivedPackets = GetDataFromBuffer(buffer);
                 packetsSequence.AddRange(receivedPackets);
 
-                if (serverNode) {
-                    foreach (DataPacket p in receivedPackets)
-                        PrintMessage(p.GetInfo());
-                }
+                PacketSequenceAdded(receivedPackets);
+
+
+
+                //if (serverNode) {
+                //    foreach (DataPacket p in receivedPackets)
+                //        PrintMessage(p.GetInfo());
+                //}
 
             }
         }
@@ -208,6 +215,8 @@ namespace ClientServerLib {
             }
         }
 
+
+        
         protected void PrintMessage(string message) {
             output(message); 
         }

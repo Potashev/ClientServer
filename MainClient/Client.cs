@@ -23,6 +23,8 @@ namespace ClientProject {
         // TODO: мб сделать id в node, и по нему смотреть - сервер node или клиент
         int clientId;
 
+        int generationTime;
+
         //List<DataPacket> packetsForSending = new List<DataPacket>();
         //byte[] localMemory = new byte[10000];
 
@@ -38,9 +40,16 @@ namespace ClientProject {
 
 
         // TODO: дописать
-        public Client(InputDelegate userInput, OutputDelegate userOutput) : base(userInput, userOutput) {
+        public Client(InputDelegate userInput, OutputDelegate userOutput, int generationTime) : base(userInput, userOutput) {
             //SequenceOverflowed += SendEvent;
             serverNode = false;
+
+            PacketSequenceAdded += SendNewPackets;
+            this.generationTime = generationTime;
+        }
+
+        void SendNewPackets(List<DataPacket> packets) {
+            SendingProccess();
         }
 
         public override void Run() {
@@ -69,7 +78,7 @@ namespace ClientProject {
             // ПРОВЕРКА ВХОДЯЩИХ ПОДКЛЮЧЕНИЙ
             if (HasInConnection()) {
                 Console.WriteLine("Есть входящие подключения");
-                Thread acceptThread = new Thread(AcceptConnections);
+                Thread acceptThread = new Thread(ReceivingProccess);
                 acceptThread.Start();
             }
             else {
@@ -87,7 +96,7 @@ namespace ClientProject {
             //sendThread.Start();
 
             //SendingProccess();
-            Console.ReadKey();
+            //Console.ReadKey();
         }
 
         void GetTopologyFromFile() {
@@ -163,7 +172,7 @@ namespace ClientProject {
         void Generation() {
             while (true) {
                 Console.WriteLine("Генерация...");
-                Thread.Sleep(500);
+                Thread.Sleep(generationTime);
 
                 lock (locker) {
                     //DataPacket newPacket = new DataPacket(clientId);
@@ -450,13 +459,13 @@ namespace ClientProject {
                         sendSocket.Connect(tcpEndPoint);
 
                         sendSocket.Send(sendBuffer);
-                        PrintMessage("Пакет отправлен");
+                        PrintMessage($"Пакет отправлен узлу {neighb.priority}");
                         successSend = true;
                         sendSocket.Shutdown(SocketShutdown.Both);
                         sendSocket.Close();
                     }
                     catch (Exception ex) {
-                        PrintMessage("Перевод маршрута..");
+                        //PrintMessage("Перевод маршрута..");
                         continue;
                     }
                 }
