@@ -12,13 +12,13 @@ using System.Threading.Tasks;
 namespace ClientServerLib {
     public abstract class Node {
 
-        protected const string SERVER_IP = "192.168.1.107";
+        protected const string SERVER_IP = "192.168.1.103";
         protected const int SERVER_PORT_FOR_TOPOLOGY = 999;
 
         //protected const int SERVER_ACCEPT_PORT = 
 
         // решение (возможно временное) определения сервера в node
-        protected bool serverNode;
+        //protected bool serverNode;
 
 
 
@@ -53,7 +53,7 @@ namespace ClientServerLib {
         }
 
         // TODO: возможно вместо виртуально сервера добавить интерфейс с Run()
-        public virtual void Run() { }
+        public abstract void Run();
 
         
         // TODO: - рудимент
@@ -100,29 +100,42 @@ namespace ClientServerLib {
             acceptSocket.Listen(1); // здесь параметр будет число соседов сервера по топологии (в теории)
 
             while (true) {
-                var listener = acceptSocket.Accept();
-                var buffer = new byte[1000];
-                List<byte[]> messageList = new List<byte[]>();  // содержит все куски сообщения
-                //var acumBuffer = new byte[10000];
-                var size = 0;
-                //var messageSize = 0;
-                //var data = new StringBuilder();
+                try {
+                    var listener = acceptSocket.Accept();
+                    var buffer = new byte[1000];
+                    List<byte[]> messageList = new List<byte[]>();  // содержит все куски сообщения
+                                                                    //var acumBuffer = new byte[10000];
+                    var size = 0;
+                    //var messageSize = 0;
+                    //var data = new StringBuilder();
 
-                // РАБОТАЕТ ЕСЛИ СООБЩЕНИЕ 1 КУСКОМ (1 ИТЕРАЦИЯ ЦИКЛА)
-                do {
-                    size = listener.Receive(buffer);
-                    //messageList.Add(buffer);
+                    // РАБОТАЕТ ЕСЛИ СООБЩЕНИЕ 1 КУСКОМ (1 ИТЕРАЦИЯ ЦИКЛА)
+                    do {
+                        size = listener.Receive(buffer);
+                        //messageList.Add(buffer);
 
-                } while (listener.Available > 0);
-                listener.Shutdown(SocketShutdown.Both);
-                listener.Close();
+                    } while (listener.Available > 0);
+                    listener.Shutdown(SocketShutdown.Both);
+                    listener.Close();
 
-                //byte[] resultbytes = GetResultBuffer(messageList);
 
-                List<DataPacket> receivedPackets = GetDataFromBuffer(buffer);
-                packetsSequence.AddRange(receivedPackets);
+                    //PrintMessage("ПРИЕМ+ ");
 
-                PacketSequenceAdded(receivedPackets);
+                    //byte[] resultbytes = GetResultBuffer(messageList);
+                    if (size > 0) {
+                        List<DataPacket> receivedPackets = GetDataFromBuffer(buffer);
+                        packetsSequence.AddRange(receivedPackets);
+
+                        PacketSequenceAdded(receivedPackets);
+                    }
+                    else {
+                        PrintMessage("СОЕДИНЕНИЕ ВОССТАНОВЛЕНО!!!");
+                    }
+                }
+                catch(Exception ex) {
+                    PrintMessage(ex.Message);
+                }
+
 
 
 
@@ -149,42 +162,48 @@ namespace ClientServerLib {
         }
 
         protected void ReceivingData(object state) {
-            AcceptConnectionInfo connection = (AcceptConnectionInfo)state;
-            byte[] buffer = new byte[255];
+        //    AcceptConnectionInfo connection = (AcceptConnectionInfo)state;
+        //    byte[] buffer = new byte[255];
 
-            // TODO: сравнить с возможным вариантом перенести try под while
-            try {
-                while (true) {
-                int bytesRead = connection.Socket.Receive(buffer);
+        //    // TODO: сравнить с возможным вариантом перенести try под while
+        //    while (true) {
+        //        try {
+        //            //while (true) {
+        //            PrintMessage("RECEIVING...");
+        //            int bytesRead = connection.Socket.Receive(buffer);
+        //            PrintMessage("RECEIVE+, " + bytesRead);
+        //            // возможно if убрать тк receive подразумевает, что пакет не пустой
+        //            // или проверить входящие данные на соответствие формату (DataIsChecked())
+        //            if (bytesRead > 1) {    //TODO: поменять
 
-                // возможно if убрать тк receive подразумевает, что пакет не пустой
-                // или проверить входящие данные на соответствие формату (DataIsChecked())
-                if (bytesRead > 0) {
+        //                List<DataPacket> receivedPackets = GetDataFromBuffer(buffer);
+        //                packetsSequence.AddRange(receivedPackets);
 
-                    List<DataPacket> receivedPackets = GetDataFromBuffer(buffer);
-                    packetsSequence.AddRange(receivedPackets);
-                        
-                    if (serverNode) {
-                        foreach (DataPacket p in receivedPackets)
-                                PrintMessage(p.GetInfo());
-                    }
+        //                //if (serverNode) {
+        //                //    foreach (DataPacket p in receivedPackets)
+        //                //            PrintMessage(p.GetInfo());
+        //                //}
 
-                        PrintMessage("Прием+");
-                }
-            }
-            }
-            catch (SocketException exc) {
+        //                PrintMessage("Прием+");
+        //            }
+        //            else {
+        //                PrintMessage("СОЕДИНЕНИЕ ВОССТАНОВЛЕНО");
+        //            }
+        //            //}
+        //        }
+        //        catch (SocketException exc) {
 
-                PrintMessage("Socket exception: " +
-                    exc.SocketErrorCode);
-            }
-            catch (Exception exc) {
-                PrintMessage("Exception: " + exc);
-            }
-            finally {
-                //connection.Socket.Close();
-                InConnections.Remove(connection);
-            }
+        //            PrintMessage("Socket exception: " +
+        //                exc.SocketErrorCode);
+        //        }
+        //        catch (Exception exc) {
+        //            PrintMessage("Exception: " + exc);
+        //        }
+        //        finally {
+        //            //connection.Socket.Close();
+        //            InConnections.Remove(connection);
+        //        }
+        //    }
         }
 
         protected List<DataPacket> GetDataFromBuffer(byte[] buffer) {

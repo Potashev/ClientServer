@@ -5,6 +5,7 @@ using System.Linq;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace ClientServerLib {
@@ -83,7 +84,7 @@ namespace ClientServerLib {
         }
 
         public string GetInfo() {
-            string packetInfo = $"Узел: {_unitId}, пакет: {_number} , данные: {_value}";
+            string packetInfo = $"Узел: {_unitId}, пакет: {_number} , значение: {_value}";
             return packetInfo;
 
         }

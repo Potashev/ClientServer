@@ -20,7 +20,6 @@ namespace ServerProject {
         public Server(InputDelegate userInput, OutputDelegate userOutput, int acceptPort, bool createTopology = false) : base(userInput, userOutput) {
 
             AcceptPort = acceptPort;
-            serverNode = true;
             this.createTopology = createTopology;
 
             PacketSequenceAdded += PrintNewPackets;
