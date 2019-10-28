@@ -40,24 +40,9 @@ namespace ServerProject {
                 ConnectAllForTopology(unitsCount);
             }
 
-
-            //List<byte[]> messageList = new List<byte[]>();
-            //messageList.Add(new byte[4]);
-            //messageList.Add(new byte[2]);
-            //var res = GetResultBuffer(messageList);
-            //Console.WriteLine(res.Length);
-            //Console.ReadKey();
-
-
             PrintMessage("Прием пакетов...");
-            //AcceptConnections();
 
             ReceivingProccess();
-            
-
-
-            //Thread acceptThread = new Thread(AcceptConnections);
-            //acceptThread.Start();
         }
 
         bool NotEmpty(byte[] buffer) {
@@ -68,58 +53,6 @@ namespace ServerProject {
             return false;
         }
         
-        //void ProcessConnection(object state) {
-        //    ConnectionInfo connection = (ConnectionInfo)state;
-        //    byte[] buffer = new byte[255];
-        //    try {
-        //        while (true) {
-        //            int bytesRead = connection.Socket.Receive(buffer);
-        //            if (bytesRead > 0) {
-
-        //                int startIndex = 0;
-        //                //while (NotEmpty(buffer)) {
-        //                    try {
-        //                        // TODO: Обрабатывать ситуации, когда в буфере несколько пакетов
-
-
-
-        //                        // ОСТАНОВИЛСЯ ЗДЕСЬ
-        //                        PrintMessage("Прием+");
-        //                    //int size = DataPacket.GetObjectSize();  // TODO: возможно сделать GetBytes.lenght т.к размер буфера считать тоже надо
-        //                    //byte[] onePacketBuf = new byte[size+1]; // размер буфера с 1 объектом на 2 ьайта больше чем объект в байтах
-        //                    //Array.Copy(buffer,startIndex, onePacketBuf, size);
-        //                    //Array.Clear(buffer, startIndex, size+2);
-        //                    //startIndex += size+2;
-
-        //                    // TODO: перенести getdatafrom в datapacket как статич
-        //                        List<DataPacket> packet = GetDataFromBuffer(buffer);
-        //                        foreach (DataPacket p in packet)
-        //                        PrintMessage(p.GetInfo());
-        //                    //PrintMessage(DataPacket.GetObjectSize().ToString()); // 36
-        //                }
-        //                    catch (Exception ex) {
-        //                        continue;
-        //                    }
-        //                //}
-
-        //            }
-        //            else if (bytesRead == 0) return;
-        //        }
-        //    }
-        //    catch (SocketException exc) {
-        //        Console.WriteLine("Socket exception: " +
-        //            exc.SocketErrorCode);
-        //    }
-        //    catch (Exception exc) {
-        //        Console.WriteLine("Exception: " + exc);
-        //    }
-        //    finally {
-        //        connection.Socket.Close();
-        //        lock (Connections) Connections.Remove(
-        //            connection);
-        //    }
-        //}
-
 
         void ConnectAllForTopology(int clientsCount) {
 

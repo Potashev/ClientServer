@@ -13,34 +13,16 @@ using System.Threading.Tasks;
 
 namespace ClientProject {
     class Client : Node {
-
-        //static object locker = new object();
-
-        // TODO: потом у клиента айпи сервера убрать из кода:
-        // либо ввод консоли, либо чтение файла
-
-
         // TODO: мб сделать id в node, и по нему смотреть - сервер node или клиент
         int clientId;
 
         int generationTime;
         int diedCHeckingTime = 10000;
 
-
-
-        //event EventHandler BestNeibFounded;
-
-        delegate void NeibStateDelegate();
-        //NeibStateDelegate NSdel;
-        event NeibStateDelegate BestNeibFounded;
-
-        //List<DataPacket> packetsForSending = new List<DataPacket>();
-        //byte[] localMemory = new byte[10000];
-
-
         // TODO: мб поднять на node, чтобы у сервера была топология входящих подключений (чтоб не пускать других)
         List<Neighbour> Neighbors = new List<Neighbour>();
 
+        // TODO: мб активного соседа инкапсулировать в класс Neighbour, и проволить манипуляции либо методами (static) либо также статич переменной neib
         Neighbour currentNeighbourForSending;
 
         Thread checkDiedNodeThread;
@@ -63,7 +45,6 @@ namespace ClientProject {
 
 
             checkDiedNodeThread = new Thread(CheckingDiedNodes);
-            BestNeibFounded += StopChecking;
         }
 
         void SendNewPackets(List<DataPacket> packets) {
@@ -73,51 +54,36 @@ namespace ClientProject {
         public override void Run() {
 
             if (File.Exists(topologyFileName)) {
-                Console.WriteLine("Восстановление топологии");
+                PrintMessage("Восстановление топологии");
                 GetTopologyFromFile();
             }
             else {
-                Console.WriteLine("Подключение для топологии");
+                PrintMessage("Подключение к серверу для получения топологии");
                 GetTopologyFromServer();
             }
-
-            Console.WriteLine("id: " + Convert.ToString(clientId));
-            Console.WriteLine("port: " + Convert.ToString(AcceptPort));
+            
+            PrintMessage($"id: {clientId}");
+            PrintMessage($"port: {AcceptPort}");
 
             ShowNeighbours();
             FindNeighbourForSending();
 
-            Console.WriteLine("Начать?");
-            Console.ReadLine();
-
-            //// ПОДКЛЮЧЕНИЕ К СЛЕДУЮЩИМ КЛИЕНТАМ
-            //CreateOutConnections();
-
-
-            // ПРОВЕРКА ВХОДЯЩИХ ПОДКЛЮЧЕНИЙ
+            PrintMessage("Начать?");
+            InputData();
+            
             if (HasInConnection()) {
-                Console.WriteLine("Есть входящие подключения");
+                PrintMessage("Есть входящие подключения");
                 Thread acceptThread = new Thread(ReceivingProccess);
                 acceptThread.Start();
             }
             else {
-                Console.WriteLine("Входящих подключений нет");
+                PrintMessage("Входящих подключений нет");
             }
-
-            // ГЕНЕРАЦИЯ ПАКЕТОВ ДАННЫХ
+            
             // TODO: сделать обертку для генерации данных GetData()
             Thread generationThread = new Thread(Generation);
             generationThread.Start();
-
-            //Thread checkDiedNodeThread = new Thread(CheckingDiedNodes);
-
-
-            //// ОТПРАВКА ПАКЕТОВ СЛЕДУЮЩИМ КЛИЕНТАМ
-            //Thread sendThread = new Thread(Sending);
-            //sendThread.Start();
-
-            //SendingProccess();
-            //Console.ReadKey();
+            
         }
 
         void CheckingDiedNodes() {
@@ -145,7 +111,7 @@ namespace ClientProject {
                             // ПОПРОБОВАТЬ ЧИСТИТЬ ОЧЕРЕДЬ ПАКЕТОВ В СЛУЧАЕ ВОССТАНОВЛЕНИЯ
 
                             needChecking = false;
-                            //sendSocket.Shutdown(SocketShutdown.Both);
+                            sendSocket.Shutdown(SocketShutdown.Both);
                             sendSocket.Close();
                             PrintMessage("СОКЕТ ЗАКРЫТ, МОЖНО ДЕЛАТЬ ОТПРАВКУ");
                             currentNeighbourForSending = n;
@@ -173,28 +139,11 @@ namespace ClientProject {
             GetNeibsFromFile();
             GetUnitIdFromFile();
             GetAcceptPortFromFile();
-
-            //FindNeighbourForSending();
         }
-
-
-        void AddToLocMem(byte[] locMem, byte[] buffer) {
-            int i = 0;
-            int j = 0;
-            while (locMem[i] != 0) {
-                i++;
-            }
-            while (j < buffer.Length) {
-                locMem[i] = buffer[j];
-                i++;
-                j++;
-            }
-        }
-
 
         bool HasInConnection() {
             foreach (Neighbour u in Neighbors) {
-                if (u.priority == -1)
+                if (u.priority == -1)   //TODO: не работать с приоритетом напрямую
                     return true;
             }
             return false;
@@ -211,24 +160,7 @@ namespace ClientProject {
                 return 1;
         }
 
-        //static void Generation() {
-        //    Console.Write("Генерация:");
-        //    string str = Console.ReadLine();
-        //    byte[] buffer = new byte[str.Length];
-        //    buffer = Encoding.ASCII.GetBytes(str);
-        //    AddToLocMem(localMemory, buffer);
-        //}
-
-        // TODO: возможно заменить, может добавить метод GetBytes в классе dataPacket
-        //byte[] ConvertPacket(DataPacket packet) {
-        //    DataContractJsonSerializer serializer = new DataContractJsonSerializer(typeof(DataPacket));
-        //    MemoryStream stream = new MemoryStream();
-        //    serializer.WriteObject(stream, packet);
-        //    byte[] bytesPacket = stream.GetBuffer();    //???
-        //    stream.Close(); // возможно закрытие потока автоматом при завершении метода
-        //    return bytesPacket;
-        //}
-
+        // временный метод
         List<DataPacket> CREATETESTS(int cnt) {
             List<DataPacket> result = new List<DataPacket>();
 
@@ -239,11 +171,9 @@ namespace ClientProject {
             return result;
         }
 
-        //public event EventHandler SequenceOverflowed;
-
+        
         void Generation() {
             while (true) {
-                //Console.WriteLine("Генерация...");
                 Thread.Sleep(generationTime);
 
                 lock (locker) {
@@ -253,58 +183,23 @@ namespace ClientProject {
                     //// 3 если не смог передать добавляю в packetSeq
                     //packetsSequence.Add(newPacket);
 
-
-
                     List<DataPacket> testpackets = CREATETESTS(1);
                     packetsSequence.AddRange(testpackets);
                 }
                 SendingProccess();
-
-
-                //if(packetsSequence.Count > 3) {
-                //    if(SequenceOverflowed != null) {
-                //        SequenceOverflowed(this, new EventArgs());
-                //    }
-                //}
-
-
-                //WriteBytesToLocMem();
-
-                //byte[] bytesPacket = ConvertPacket(packet);
-
-
-                //byte[] bytesPacket = DataPacket.GetBytes(list);
-                //AddToLocMem(localMemory, bytesPacket);
-
-                //List<DataPacket> list2 = new List<DataPacket>();
-                //list2.Add(new DataPacket(clientId));
-                //byte[] bytesPacket2 = DataPacket.GetBytes(list2);
-                //AddToLocMem(localMemory, bytesPacket2);
-
-                //DataPacket packet2 = new DataPacket(clientId);
-                ////byte[] bytesPacket = ConvertPacket(packet);
-                //byte[] bytesPacket2 = DataPacket.GetBytes(packet2);
-                //AddToLocMem(localMemory, bytesPacket2);
-
             }
         }
 
-        //void WriteBytesToLocMem() {
-        //    byte[] bytesPacket = DataPacket.GetBytes(packetsForSending);
-        //    Array.Clear(localMemory,0,localMemory.Length);
-        //    AddToLocMem(localMemory, bytesPacket);
-        //}
-
-        // TODO: посмотреть что общего с методом outconnect (возможно объеденить)
+        
         void ConnectToServer(out Socket socket) {
-            Console.WriteLine("Подключение к серверу для топологии..");
+            PrintMessage("Подключение к серверу для топологии..");
             socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             //serverSocket.Bind(new IPEndPoint(IPAddress.Any, 660));      // необязательно
             socket.Connect(SERVER_IP, SERVER_PORT_FOR_TOPOLOGY);
         }
 
         void GetNeibsFromServer(Socket socket) {
-            Console.WriteLine("Прием топологии..");
+            PrintMessage("Прием топологии..");
             //DataContractJsonSerializer jsonSerializer = new DataContractJsonSerializer(typeof(List<Unit>));
             byte[] neighborsBuffer = new byte[1000];
 
@@ -328,14 +223,12 @@ namespace ClientProject {
         void GetUnitIdFromServer(Socket socket) {
             byte[] receiveId = new byte[1000];
             lock (locker) {
-                // получение id
                 socket.Receive(receiveId);
 
 
                 byte[] arr = new byte[BytesInCollection(receiveId)];
                 CopyFromTo(receiveId, arr);
                 string strId = Encoding.ASCII.GetString(arr);
-                //Console.WriteLine("id:" + strId + "!");
                 clientId = int.Parse(strId);
             }
         }
@@ -348,7 +241,6 @@ namespace ClientProject {
                 byte[] arr2 = new byte[BytesInCollection(receivePort)];
                 CopyFromTo(receivePort, arr2);
                 string strPort = Encoding.ASCII.GetString(arr2);
-                //Console.WriteLine("port:" + strPort + "!");
                 AcceptPort = int.Parse(strPort);
             }
         }
@@ -370,9 +262,9 @@ namespace ClientProject {
         }
 
         void ShowNeighbours() {
-            Console.WriteLine("Полученная топология:");
+            PrintMessage("Полученная топология:");
             foreach (Neighbour u in Neighbors) {
-                Console.WriteLine(u.ip + ":" + u.acceptPort + ", " + u.priority);
+                PrintMessage(u.ip + ":" + u.acceptPort + ", " + u.priority);
             }
         }
 
@@ -384,52 +276,11 @@ namespace ClientProject {
             //serverSocket.Close();
             CloseSocket(serverSocket);
 
-            Neighbors.Sort(CompareUnitsByPriority); // TODO: посмотреть как работает данный вызов
+            Neighbors.Sort(CompareUnitsByPriority); // TODO: возможно сортировку перенести на сервер перед отправкой
             WriteFiles();
-
-            //FindNeighbourForSending();
-
-
-            //ShowNeighbours();
         }
 
-
-
-        // подключение к следующим узлам 
-        void CreateOutConnections() {
-            foreach (Neighbour neighb in Neighbors) {
-                if (neighb.priority > 0) {
-                    neighb.socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-                    neighb.socket.Connect(neighb.ip, neighb.acceptPort);
-                }
-            }
-            Console.WriteLine("OutСonnect +");
-        }
-
-        // TODO: ВРЕМЕННО - УБРАТЬ!
-        //DataPacket GetDataFromBuffer(byte[] buffer) {
-        //    DataContractJsonSerializer serializer = new DataContractJsonSerializer(typeof(DataPacket));
-        //    DataPacket packet = new DataPacket();
-        //    byte[] streamBuffer = new byte[BytesInCollection(buffer)];
-        //    CopyFromTo(buffer, streamBuffer);
-        //    MemoryStream stream = new MemoryStream(streamBuffer);
-        //    stream.Position = 0;    // необязательно?
-        //    packet = (DataPacket)serializer.ReadObject(stream);
-        //    stream.Close();
-        //    return packet;
-        //}
-
-        //int GetBytesCountInLocMem() {
-        //    int bytesCount = 0;
-        //    while (localMemory[bytesCount] != 0) {
-        //        bytesCount++;
-        //    }
-        //    return bytesCount;
-        //}
-
-        byte[] GetBufferForSending(/*int bufferSize*/) {
-            //byte[] buffer = new byte[bufferSize];
-            //CopyFromTo(localMemory, buffer);
+        byte[] GetBufferForSending() {
 
             // БЛОКИРОВКА ТЕСТОВАЯ
             byte[] bytesPacket;
@@ -467,56 +318,8 @@ namespace ClientProject {
             }
         }
 
-
-        //void SendEvent(object sender, EventArgs e) {
-        //    Console.WriteLine("Мы в событии!!!");
-        //    // TODO: возможно убрать ВСЕ циклы while(true) и попроб заменить на события
-        //        if (packetsSequence.Count > 0) {
-        //            byte[] sendBuffer = GetBufferForSending(/*dataBytesInLocMemory*/);
-        //            bool successSend = false;
-        //            foreach (Neighbour neighb in Neighbors) {
-        //                if (neighb.priority > 0) {
-        //                    if (neighb.died) {
-        //                        Console.Write("Попытка восстановить соединение: ");
-        //                        TryLifeUpConnection(neighb, out bool successLifeUp);
-        //                        if (successLifeUp) {
-        //                            Console.WriteLine("восстановлено");
-        //                            neighb.died = false;
-        //                        }
-        //                        else {
-        //                            Console.WriteLine("не восстановлено");
-        //                        }
-        //                    }
-
-        //                    TrySend(sendBuffer, neighb, ref successSend);
-        //                    if (successSend) {
-        //                        Console.WriteLine("Передача+");
-        //                        // TODO: записать номер пакета в файл
-        //                        //Array.Clear(localMemory, 0, dataBytesInLocMemory - 1);
-        //                        packetsSequence.Clear();
-        //                        break;
-
-        //                    }
-        //                    else {
-        //                        Console.WriteLine("Перевод маршрута");
-        //                        neighb.died = true;
-        //                        continue;
-        //                    }
-        //                }
-        //            }
-
-        //            if (!successSend) {
-        //                Console.WriteLine("Пакет отправить не удалось");
-        //                Thread.Sleep(5000);
-        //            }
-        //        }
-        //}
-
-
-
         //1 пробуем подключиться
         //2 если не смогли - меняем currentNeib
-
         void SendingProccess() {
             Socket sendSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
 
@@ -564,37 +367,10 @@ namespace ClientProject {
                     currentNeighbourForSending = n;
                     PrintMessage($"ТЕКУЩИЙ СОСЕД - {currentNeighbourForSending.priority}");
                     success = true;
-
-
-                    //Socket sendSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-                    //    var tcpEndPoint = new IPEndPoint(IPAddress.Parse(currentNeighbourForSending.ip), currentNeighbourForSending.acceptPort);
-                    //    PrintMessage("connect in FINDnEIB..");
-                    //    sendSocket.Connect(tcpEndPoint);
-                    //    sendSocket.Shutdown(SocketShutdown.Both);
-                    //    sendSocket.Close();
-
-
-
-                        // TODO: разобрать вторую часть условия
-                        //if ((currentNeighbourForSending.priority == 1) && (checkDiedNodeThread.ThreadState == ThreadState.Running)) {
-                        //    // отключение потока проверки
-                        //    PrintMessage("ОТКЛЮЧЕНИЕ ПРОВЕРКИ..");
-
-
-
-                        //    //BestNeibFounded(this, EventArgs.Empty);
-
-                        //    //BestNeibFounded();
-
-                        //    //StopChecking();
-
-                        //    PrintMessage("ПРОВЕРКА ОТКЛЮЧЕНА");
-                        //}
-                        break;
+                    break;
                 }
                 else if ((n.priority == 1) && (n.died) && (!checkDiedNodeThread.IsAlive)) {
-                    // запуск асинхронной проверки мертвых (поток)
-                    PrintMessage("ITS NOT ALIVE");
+                    PrintMessage("ITS NOT ALIVE !!!");
                     PrintMessage("ВКЛЮЧЕНИЕ ПРОВЕРКИ..");
                     StartChecking();
 
@@ -602,6 +378,7 @@ namespace ClientProject {
             }
             if (!success) {
                 PrintMessage($"Нет доступных каналов отправки");
+                // TODO: в данном случае подумать над генерацией события, которое стоппит отправку
             }
         }
 
@@ -609,126 +386,7 @@ namespace ClientProject {
 
             checkDiedNodeThread = new Thread(CheckingDiedNodes);
             checkDiedNodeThread.Start();
-
-            // будет ли выполняться при завершении метода?
         }
-        void StopChecking() {
-            //if (Thread.CurrentThread != checkDiedNodeThread) {
-            try {
-                checkDiedNodeThread.Abort();//прерываем поток
-            }
-            catch (Exception ex) {
-                //checkDiedNodeThread.Join(500);//таймаут на завершение
-                PrintMessage("СТОППП ПРОВЕРКА!!");
-                PrintMessage(ex.Message);
-            }
-            //}
-        }
-
-
-        //void SendingProccess() {
-
-        //    //var tcpEndPoint = new IPEndPoint(IPAddress.Parse(SERVER_IP), 700);
-        //        Socket sendSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-        //        //sendSocket.SendTimeout = 10;
-
-
-        //        // 1 ЗАПРЕЩАЕМ ДОБАВЛЕНИЕ В PACKETSEQ
-        //        // 2 ВЫЗЫВАЕМ GETBUFFERFORS..
-        //        // 3 ОЧИЩАЕМ PACKETSEQ
-        //        // 4 СНИМАЕМ ЗАПРЕТ НА ДОББАВЛЕНИЕ
-        //        // ** это нужно на случай, что между getbuf и packets.clear придут пакеты, которые затрутся
-        //        byte[] sendBuffer = GetBufferForSending();
-        //        packetsSequence.Clear();
-
-        //    // TODO: проверить перевод маршрута
-        //    bool successSend = false;
-
-        //    foreach (Neighbour neighb in Neighbors) {
-        //        if (neighb.priority > 0) {
-        //            try {
-        //                var tcpEndPoint = new IPEndPoint(IPAddress.Parse(neighb.ip), neighb.acceptPort);
-        //                PrintMessage("Установка соединения...");
-        //                sendSocket.Connect(tcpEndPoint);
-        //                PrintMessage("Отправка пакета...");
-        //                sendSocket.Send(sendBuffer);
-        //                PrintMessage($"Пакет отправлен узлу {neighb.priority}");
-        //                successSend = true;
-        //                sendSocket.Shutdown(SocketShutdown.Both);
-        //                sendSocket.Close();
-        //            }
-        //            catch (Exception ex) {
-        //                continue;
-        //            }
-        //        }
-
-        //    }
-        //    if (!successSend) {
-        //        PrintMessage("Пакет отправить не удалось");
-        //    }
-
-        //}
-
-        // отправка пакетов
-        void Sending() {
-            // TODO: возможно убрать ВСЕ циклы while(true) и попроб заменить на события
-            while (true) {
-                //int dataBytesInLocMemory = GetBytesCountInLocMem();
-                //if (dataBytesInLocMemory > 0) {
-                if (packetsSequence.Count > 0) {
-                    byte[] sendBuffer = GetBufferForSending(/*dataBytesInLocMemory*/);
-                    bool successSend = false;
-                    foreach (Neighbour neighb in Neighbors) {
-                        if (neighb.priority > 0) {
-                            if (neighb.died) {
-                                Console.Write("Попытка восстановить соединение: ");
-                                TryLifeUpConnection(neighb, out bool successLifeUp);
-                                if (successLifeUp) {
-                                    Console.WriteLine("восстановлено");
-                                    neighb.died = false;
-                                }
-                                else {
-                                    Console.WriteLine("не восстановлено");
-                                }
-                            }
-                            
-                            TrySend(sendBuffer, neighb, ref successSend);
-
-                            if (successSend) {
-                                Console.WriteLine("Передача+");
-                                // TODO: записать номер пакета в файл
-                                //Array.Clear(localMemory, 0, dataBytesInLocMemory - 1);
-                                packetsSequence.Clear();
-                                break;
-
-                            }
-                            else {
-                                Console.WriteLine("Перевод маршрута");
-                                neighb.died = true;
-                                continue;
-                            }
-                        }
-                    }
-
-                    if (!successSend) {
-                        Console.WriteLine("Пакет отправить не удалось");
-                        Thread.Sleep(5000);
-                    }
-                }
-                Thread.Sleep(1);       // перестает есть проц (с 25% до 0)
-            }
-        }
-
-        //void FileWriteIdAndPort() {
-        //    //FileStream fs = File.Create(@"Id.txt");
-        //    StreamWriter textFile = new StreamWriter(idFileName);
-        //    textFile.WriteLine(Convert.ToString(myId));
-        //    textFile.Close();
-
-        //    StreamWriter PortFile = new StreamWriter(portFileName);
-        //    PortFile.WriteLine(Convert.ToString(myAcceptPort));
-        //    PortFile.Close();
-        //}
 
         void GetNeibsFromFile() {
             DataContractJsonSerializer jsonSerializer = new DataContractJsonSerializer(typeof(List<Neighbour>));
