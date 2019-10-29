@@ -12,12 +12,20 @@ using System.Threading;
 using System.Threading.Tasks;
 
 namespace ClientProject {
+
+    //enum ClientState {
+    //    canSand,
+    //    waitSanding
+    //}
+
     class Client : Node {
         // TODO: мб сделать id в node, и по нему смотреть - сервер node или клиент
         int clientId;
 
         int generationTime;
         int diedCHeckingTime = 10000;
+
+        bool sendingAvailable;
 
         // TODO: мб поднять на node, чтобы у сервера была топология входящих подключений (чтоб не пускать других)
         List<Neighbour> Neighbors = new List<Neighbour>();
@@ -40,15 +48,21 @@ namespace ClientProject {
         // TODO: дописать
         public Client(InputDelegate userInput, OutputDelegate userOutput, int generationTime) : base(userInput, userOutput) {
 
-            PacketSequenceAdded += SendNewPackets;
+            PacketSequenceAdded += TrySendNewPackets;
             this.generationTime = generationTime;
 
 
             checkDiedNodeThread = new Thread(CheckingDiedNodes);
         }
 
-        void SendNewPackets(List<DataPacket> packets) {
-            SendingProccess();
+        // метод заглушка для обработки события на клиенте
+        void TrySendNewPackets(List<DataPacket> packets = null) {
+            if (sendingAvailable) {
+                SendingProccess();
+            }
+            else {
+                PrintMessage("Отправка пакетов остановлена");
+            }
         }
 
         public override void Run() {
@@ -114,7 +128,8 @@ namespace ClientProject {
                             sendSocket.Shutdown(SocketShutdown.Both);
                             sendSocket.Close();
                             PrintMessage("СОКЕТ ЗАКРЫТ, МОЖНО ДЕЛАТЬ ОТПРАВКУ");
-                            currentNeighbourForSending = n;
+                            //currentNeighbourForSending = n;
+                            FindNeighbourForSending();
                             PrintMessage("СОЕДИНЕНИЕ ВОССТАНОВЛЕНО =)");
                             break;
 
@@ -185,8 +200,11 @@ namespace ClientProject {
 
                     List<DataPacket> testpackets = CREATETESTS(1);
                     packetsSequence.AddRange(testpackets);
+
+                    //PacketSequenceAdded(testpackets);
+                    TrySendNewPackets();
                 }
-                SendingProccess();
+                //SendingProccess();
             }
         }
 
@@ -355,6 +373,17 @@ namespace ClientProject {
             }
         }
 
+        //void SendingProccessV2() {
+        //    SelectAddPacketSeq();
+        //    GetSendBuffer();
+        //    SendBuffer(out bool success);
+        //    if (success) {
+        //        ClearPacketSeq();
+        //    }
+        //    SelectMainPs();
+        //    TransferNewDataFromAddPS();
+        //}
+
 
 
         void FindNeighbourForSending() {
@@ -367,6 +396,7 @@ namespace ClientProject {
                     currentNeighbourForSending = n;
                     PrintMessage($"ТЕКУЩИЙ СОСЕД - {currentNeighbourForSending.priority}");
                     success = true;
+                    sendingAvailable = true;
                     break;
                 }
                 else if ((n.priority == 1) && (n.died) && (!checkDiedNodeThread.IsAlive)) {
@@ -378,6 +408,7 @@ namespace ClientProject {
             }
             if (!success) {
                 PrintMessage($"Нет доступных каналов отправки");
+                sendingAvailable = false;
                 // TODO: в данном случае подумать над генерацией события, которое стоппит отправку
             }
         }
