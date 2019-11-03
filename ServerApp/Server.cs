@@ -2,11 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Net;
 using System.Net.Sockets;
-using System.Runtime.Serialization;
-using System.Runtime.Serialization.Json;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -22,13 +18,8 @@ namespace ServerProject {
             AcceptPort = acceptPort;
             this.createTopology = createTopology;
 
-            PacketSequenceAdded += PrintNewPackets;
+            eventPacketSequenceAdded += PrintNewPackets;
 
-        }
-
-        void PrintNewPackets(List<DataPacket> packets) {
-                foreach (DataPacket p in packets)
-                    PrintMessage(p.GetInfo());
         }
 
         public override void Run() {
@@ -36,7 +27,7 @@ namespace ServerProject {
             if (createTopology) {
                 PrintMessage("Формирование топологии");
                 PrintMessage("Введите число подключений");
-                int unitsCount = GetConnectionsCount();
+                GetConnectionsCount(out int unitsCount);
                 ConnectAllForTopology(unitsCount);
             }
 
@@ -45,20 +36,27 @@ namespace ServerProject {
             ReceivingProccess();
         }
 
-        bool NotEmpty(byte[] buffer) {
-            for(int i=0; i< buffer.Length; i++) {
-                if (buffer[i] != 0)
-                    return true;
-            }
-            return false;
+        void PrintNewPackets(List<DataPacket> packets) {
+                foreach (DataPacket p in packets)
+                    PrintMessage(p.GetInfo());
         }
+
+        
+
+        //bool NotEmpty(byte[] buffer) {
+        //    for(int i=0; i< buffer.Length; i++) {
+        //        if (buffer[i] != 0)
+        //            return true;
+        //    }
+        //    return false;
+        //}
         
 
         void ConnectAllForTopology(int clientsCount) {
 
             // TODO: возможно позже здесь формировать список клиентов и передавать в методы
 
-            List<Client> сlients = new List<Client>();
+            List<TopologyClient> сlients = new List<TopologyClient>();
             OpenConnectForTopology(clientsCount, сlients);
             CreateTopology(сlients);
             CloseConnectionForTopology(сlients);
@@ -66,7 +64,7 @@ namespace ServerProject {
 
         }
 
-        void OpenConnectForTopology(int clientsCount, List<Client> clients) {
+        void OpenConnectForTopology(int clientsCount, List<TopologyClient> clients) {
             //Socket serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             //serverSocket.Bind(new IPEndPoint(IPAddress.Any, SERVER_PORT_FOR_TOPOLOGY));
             //serverSocket.Listen(1);
@@ -79,7 +77,7 @@ namespace ServerProject {
             for (int i = 0; i < clientsCount; i++) {
                 Socket socket = serverSocket.Accept();
                 PrintMessage("Новое подключение");
-                Client newClient = new Client(socket);
+                TopologyClient newClient = new TopologyClient(socket);
                 clients.Add(newClient);
             }
             PrintMessage("Все подключились");
@@ -92,9 +90,9 @@ namespace ServerProject {
 
         }
 
-        void CreateTopology(List<Client> clients) {
+        void CreateTopology(List<TopologyClient> clients) {
             ShowClients(clients);
-            foreach (Client client in clients) {
+            foreach (TopologyClient client in clients) {
                 List<Neighbour> Neibs = GetNeibsForClient(client, clients);
                 ConvertNeibsForSending(Neibs, out byte[] buffer);
                 Neibs.Clear();
@@ -103,11 +101,11 @@ namespace ServerProject {
             }
         }
 
-        void ShowClients (List<Client> clients){
+        void ShowClients (List<TopologyClient> clients){
             PrintMessage("Узлы топологии:");
             string ip;
             int id;
-            foreach (Client cl in clients) {
+            foreach (TopologyClient cl in clients) {
                 ip = Convert.ToString(cl._socket.RemoteEndPoint);
                 id = cl._id;
                 PrintMessage($"ip:port = {ip}, id = {id}");
@@ -129,20 +127,20 @@ namespace ServerProject {
             }
         }
 
-        int GetConnectionsCount() {
+        void GetConnectionsCount(out int count) {
             string strCount = InputData();
-                int count = int.Parse(strCount);
-                return count;
+            count = int.Parse(strCount);
+                //return count;
         }
 
         // TODO: Добавить проверку на дурака
-        int GetNeibPriority() {
+        int InputNeibPriority() {
             PrintMessage("Приоритет:");
             int priority = int.Parse(InputData());
             return priority;
         }
 
-        List<Neighbour> GetNeibsForClient(Client client, List<Client> clients) {
+        List<Neighbour> GetNeibsForClient(TopologyClient client, List<TopologyClient> clients) {
 
             string clientIp = client.GetIpPort();
             int clientId = client._id;
@@ -162,10 +160,10 @@ namespace ServerProject {
                     continue;
                 }
 
-                foreach (Client cl in clients) {
+                foreach (TopologyClient cl in clients) {
 
                     if (cl._id == id) {
-                       int priority = GetNeibPriority();
+                        int priority = InputNeibPriority();
                         string ip = cl.GetIp();
                         int port = cl._acceptPort;
                         Neighbour n = new Neighbour(ip, priority, port);
@@ -179,7 +177,7 @@ namespace ServerProject {
             return neibs;
         }
         
-        void SendNeibs(Client client, byte[] buffer) {
+        void SendNeibs(TopologyClient client, byte[] buffer) {
             lock (locker) {
                 client._socket.Send(buffer);
 
@@ -194,17 +192,14 @@ namespace ServerProject {
         }
 
         void ConvertNeibsForSending(List<Neighbour> neibs, out byte[] buffer) {
-            buffer = new byte[1000];
-            DataContractJsonSerializer jsonSerializer = new DataContractJsonSerializer(typeof(List<Neighbour>));
-            MemoryStream stream = new MemoryStream();
-            jsonSerializer.WriteObject(stream, neibs);
-            //Neibs.Clear();
-            buffer = stream.GetBuffer();
-            stream.Close();
+            MemoryStream memoryStream = new MemoryStream();
+            SerializeJson(neibs, memoryStream);
+            buffer = memoryStream.GetBuffer();
+            memoryStream.Close();
         }
 
-        void CloseConnectionForTopology(List<Client> clients) {
-            foreach (Client cl in clients) {
+        void CloseConnectionForTopology(List<TopologyClient> clients) {
+            foreach (TopologyClient cl in clients) {
                 ////cl._socket.Shutdown((SocketShutdown.Both));
                 //cl._socket.Close();
                 CloseSocket(cl._socket);
@@ -212,22 +207,22 @@ namespace ServerProject {
         }
     }
 
-    class Client {
+    class TopologyClient {
         public Socket _socket;
         public int _id;
         // порт приема каждого узла (теперь можно на одном компе запускать несколько клиентов)
         public int _acceptPort;
 
-        static int countClients = 1; // серв - id 0
+        static int clientCounter = 1; // серв - id 0
 
-        static int acceptPort = 660;
+        static int acceptPortCounter = 660;
 
-        public Client(Socket socket) {
+        public TopologyClient(Socket socket) {
             _socket = socket;
-            _id = countClients;
-            _acceptPort = acceptPort;
-            countClients++;
-            acceptPort++;
+            _id = clientCounter;
+            _acceptPort = acceptPortCounter;
+            clientCounter++;
+            acceptPortCounter++;
         }
 
         public string GetIpPort() {

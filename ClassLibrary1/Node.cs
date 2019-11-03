@@ -12,7 +12,7 @@ using System.Threading.Tasks;
 namespace ClientServerLib {
     public abstract class Node {
 
-        protected const string SERVER_IP = "192.168.1.103";
+        protected const string SERVER_IP = "192.168.1.106";
         protected const int SERVER_PORT_FOR_TOPOLOGY = 999;
         // решение (возможно временное) определения сервера в node
         //protected bool serverNode;
@@ -65,7 +65,12 @@ namespace ClientServerLib {
         }
 
         public delegate void PacketSequenceState(List<DataPacket> addedPackets);
-        public event PacketSequenceState PacketSequenceAdded;
+        public event PacketSequenceState eventPacketSequenceAdded;
+
+        // TODO: ПРОВЕРИТЬ
+        virtual protected void AddPacketsInSequence(List<DataPacket> packets) {
+            packetsSequence.AddRange(packets);
+        }
 
         protected void ReceivingProccess() {
             Socket acceptSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
@@ -98,9 +103,11 @@ namespace ClientServerLib {
                     //byte[] resultbytes = GetResultBuffer(messageList);
                     if (size > 0) {
                         List<DataPacket> receivedPackets = GetDataFromBuffer(buffer);
-                        packetsSequence.AddRange(receivedPackets);
 
-                        PacketSequenceAdded(receivedPackets);
+                        //packetsSequence.AddRange(receivedPackets);
+                        AddPacketsInSequence(receivedPackets);
+
+                        eventPacketSequenceAdded(receivedPackets);
                     }
                     else {
                         PrintMessage("СОЕДИНЕНИЕ ВОССТАНОВЛЕНО!!!");
@@ -139,6 +146,32 @@ namespace ClientServerLib {
             packet = (List<DataPacket>)serializer.ReadObject(stream);
             stream.Close();
             return packet;
+        }
+
+
+        // пример полиморфизма (апкаста): принимает memorystream и filestream
+        protected void SerializeJson(List<Neighbour> neighbours, Stream stream) {
+            DataContractJsonSerializer jsonSerializer = new DataContractJsonSerializer(typeof(List<Neighbour>));
+            jsonSerializer.WriteObject(stream, neighbours);
+        }
+
+        protected List<Neighbour> DeserializeJson(Stream stream) {
+            DataContractJsonSerializer jsonSerializer = new DataContractJsonSerializer(typeof(List<Neighbour>));
+            List<Neighbour> Neighbors = (List<Neighbour>)jsonSerializer.ReadObject(stream);
+            return Neighbors;
+        }
+
+        protected int ReadStream(string fileName) {
+            StreamReader stream = new StreamReader(fileName);
+            int result = Convert.ToInt32(stream.ReadLine());
+            stream.Close();
+            return result;
+        }
+
+        protected void WriteStream(string fileName, int value) {
+            StreamWriter stream = new StreamWriter(fileName);
+            stream.WriteLine(Convert.ToString(value));
+            stream.Close();
         }
 
         // TODO: возможно позже поменять на dataInCollection (либо подобное)

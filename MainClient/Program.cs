@@ -16,10 +16,16 @@ namespace ClientProject
     {
 
         static void Main(string[] args) {
-            Console.WriteLine("\tClient");
+            Console.WriteLine("\tClient!");
             Console.Write("Время генерации пакета: ");
             int time =int.Parse(Console.ReadLine());
-            Client terminal = new Client(Console.ReadLine, Console.WriteLine, time);
+            Console.Write("Время отправки: ");
+            string sendingTimeStr = Console.ReadLine();
+            if (sendingTimeStr == "") {
+                sendingTimeStr = "0";
+            }
+            int sendingTime = int.Parse(sendingTimeStr);
+            Client terminal = new Client(Console.ReadLine, Console.WriteLine, time, 10000, sendingTime);
             terminal.Run();
         }
     }

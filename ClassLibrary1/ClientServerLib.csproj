@@ -43,6 +43,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AcceptConnectionInfo.cs" />
+    <Compile Include="Class1.cs" />
     <Compile Include="DataPacket.cs" />
     <Compile Include="Node.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
