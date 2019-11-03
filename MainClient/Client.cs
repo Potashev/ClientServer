@@ -396,31 +396,13 @@ namespace ClientProject {
         }
 
         void GetTopologyFromFile() {
-            //GetNeibsFromFile();
-
             FileStream fsReading = new FileStream(topologyFileName, FileMode.OpenOrCreate);
-            Neighbors = DeserializeJson(fsReading);
+            Neighbors = DeserializeJson<Neighbour>(fsReading);
             fsReading.Close();  // нужно ли закрывать?
 
             clientId = ReadStream(idFileName);
             AcceptPort = ReadStream(portFileName);
         }
-
-        //void GetNeibsFromFile() {
-        //    FileStream fsReading = new FileStream(topologyFileName, FileMode.OpenOrCreate);
-        //    Neighbors = DeserializeJson(fsReading);
-        //    fsReading.Close();  // нужно ли закрывать?
-
-        //}
-
-        //void GetUnitIdFromFile() {
-        //    clientId = ReadStream(idFileName);
-
-        //}
-        //void GetAcceptPortFromFile() {
-        //    AcceptPort = ReadStream(portFileName);
-
-        //}
 
         void GetTopologyFromServer() {
             ConnectToServer(out Socket serverSocket);
@@ -459,7 +441,7 @@ namespace ClientProject {
             CopyFromTo(neighborsBuffer, streamBuffer);
 
             MemoryStream memoryStream = new MemoryStream(streamBuffer);
-            Neighbors = DeserializeJson(memoryStream);
+            Neighbors = DeserializeJson<Neighbour>(memoryStream);
             memoryStream.Close(); // TODO: проверить необходимость закрытия, ведь метод завершается
         }
 

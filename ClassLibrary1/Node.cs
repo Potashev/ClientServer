@@ -135,17 +135,15 @@ namespace ClientServerLib {
         }
 
         protected List<DataPacket> GetDataFromBuffer(byte[] buffer) {
-            DataContractJsonSerializer serializer = new DataContractJsonSerializer(typeof(List<DataPacket>));
-            //DataPacket packet = new DataPacket();
-            List<DataPacket> packet = new List<DataPacket>();
             byte[] streamBuffer = new byte[BytesInCollection(buffer)];
             // TODO: возможно поменять на array.(copy)
             CopyFromTo(buffer, streamBuffer);
-            MemoryStream stream = new MemoryStream(streamBuffer);
-            stream.Position = 0;    // необязательно?
-            packet = (List<DataPacket>)serializer.ReadObject(stream);
-            stream.Close();
-            return packet;
+
+            MemoryStream memoryStream = new MemoryStream(streamBuffer);
+            List<DataPacket> packets = DeserializeJson<DataPacket>(memoryStream);
+            memoryStream.Close();
+
+            return packets;
         }
 
 
@@ -155,10 +153,10 @@ namespace ClientServerLib {
             jsonSerializer.WriteObject(stream, neighbours);
         }
 
-        protected List<Neighbour> DeserializeJson(Stream stream) {
-            DataContractJsonSerializer jsonSerializer = new DataContractJsonSerializer(typeof(List<Neighbour>));
-            List<Neighbour> Neighbors = (List<Neighbour>)jsonSerializer.ReadObject(stream);
-            return Neighbors;
+        protected List<T> DeserializeJson<T>(Stream stream) {
+            DataContractJsonSerializer jsonSerializer = new DataContractJsonSerializer(typeof(List<T>));
+            List<T> resultList = (List<T>)jsonSerializer.ReadObject(stream);
+            return resultList;
         }
 
         protected int ReadStream(string fileName) {
