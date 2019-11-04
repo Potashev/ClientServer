@@ -14,8 +14,6 @@ namespace ClientServerLib {
 
         protected const string SERVER_IP = "192.168.1.106";
         protected const int SERVER_PORT_FOR_TOPOLOGY = 999;
-        // решение (возможно временное) определения сервера в node
-        //protected bool serverNode;
 
         protected IPAddress Ip { get; set; }
         protected int AcceptPort { get; set; }

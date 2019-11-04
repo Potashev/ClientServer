@@ -11,7 +11,7 @@ namespace ServerProject {
     public class Server: Node {
 
         //static object locker = new object();    // TODO: попробовать перенести locker в SendNeibs
-        bool createTopology;
+        private bool createTopology;
 
         public Server(InputDelegate userInput, OutputDelegate userOutput, int acceptPort, bool createTopology = false) : base(userInput, userOutput) {
 
@@ -19,7 +19,6 @@ namespace ServerProject {
             this.createTopology = createTopology;
 
             eventPacketSequenceAdded += PrintNewPackets;
-
         }
 
         public override void Run() {

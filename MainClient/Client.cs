@@ -13,13 +13,42 @@ namespace ClientProject {
     class Client : Node {
         int clientId;
 
-        int generationTime;
-        int diedCHeckingTime;
+        private int timeGeneration;
+        private int timeCheckingDied;
+
+        private bool addPacketsInMainSequnce;
+        private bool sendingAvailable;
+
         int SENDTIME;       // временное - в конце убрать
 
+        public int TimeGeneration {
+            get {
+                return timeGeneration;
+            }
+            set {
+                if(value > 0) {
+                    timeGeneration = value;
+                }
+                else {
+                    timeGeneration = 100;
+                }
+            }
+        }
+        public int TimeCheckingDied {
+            get {
+                return timeCheckingDied;
+            }
+            set {
+                if (value > 0) {
+                    timeCheckingDied = value;
+                }
+                else {
+                    timeCheckingDied = 5000;
+                }
+            }
+        }
 
-        bool sendingAvailable;
-        bool addPacketsInMainSequnce;
+        
 
         //TODO: при анализе sending'а проверить, в надо ли addseq
         List<DataPacket> additionalPacketsSequence = new List<DataPacket>();
@@ -40,13 +69,13 @@ namespace ClientProject {
         string portFileName = @"port.txt";
 
         public Client(InputDelegate userInput, OutputDelegate userOutput, int generationTime, int checkDiedTime, int TIME) : base(userInput, userOutput) {
-
-            eventPacketSequenceAdded += TrySendNewPackets;
-            this.generationTime = generationTime;
+            
+            TimeGeneration = generationTime;
+            TimeCheckingDied = checkDiedTime;
             //this.generationTime = CheckInputData(generationTime.ToString(), x => x >= 0);   // TODO: подумать, как упростить ввод и проверку genTime,
             checkDiedNodeThread = new Thread(CheckingDiedNodes);
-            diedCHeckingTime = checkDiedTime;
             addPacketsInMainSequnce = true;
+            eventPacketSequenceAdded += TrySendNewPackets;
 
             SENDTIME = TIME;
 
@@ -73,9 +102,10 @@ namespace ClientProject {
                 GetTopologyFromServer();
             }
             
-            PrintMessage($"id: {clientId}");
-            PrintMessage($"port: {AcceptPort}");
+            //PrintMessage($"id: {clientId}");
+            //PrintMessage($"port: {AcceptPort}");
 
+            ShowConfiguration();
             ShowNeighbours();
             FindNeighbourForSending();
 
@@ -103,11 +133,18 @@ namespace ClientProject {
 
         }
 
+        void ShowConfiguration() {
+            PrintMessage($"time generation : {TimeGeneration}");
+            PrintMessage($"time checking for live up: {TimeCheckingDied}");
+            PrintMessage($"id: {clientId}");
+            PrintMessage($"port: {AcceptPort}");
+        }
+
         void CheckingDiedNodes() {
             bool needChecking = true;
             while (needChecking) {
                 PrintMessage($"ПРОВЕРКА МЕРТвячинки потоком {Thread.CurrentThread.ManagedThreadId}");
-                Thread.Sleep(diedCHeckingTime);
+                Thread.Sleep(TimeCheckingDied);
                 foreach (Neighbour n in Neighbors) {
                     if ((n.IsDied) && (n.IsForSending()) && (n.IsBetterThan(currentNeighbourForSending)/*n.Priority <= currentNeighbourForSending.Priority*/)) {
 
@@ -179,7 +216,7 @@ namespace ClientProject {
         // Т.е работа не потока внутри класса, а внешняя генерация данных извне и передача уже в Client
         void Generation() {
             while (true) {
-                Thread.Sleep(generationTime);
+                Thread.Sleep(TimeGeneration);
 
                 lock (locker) {
                     //DataPacket newPacket = new DataPacket(clientId);
@@ -415,7 +452,7 @@ namespace ClientProject {
         }
 
         void ConnectToServer(out Socket socket) {
-            PrintMessage("Подключение к серверу для топологии..");
+            //PrintMessage("Подключение к серверу для топологии..");
             socket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             //serverSocket.Bind(new IPEndPoint(IPAddress.Any, 660));      // необязательно
             socket.Connect(SERVER_IP, SERVER_PORT_FOR_TOPOLOGY);
