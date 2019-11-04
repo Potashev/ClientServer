@@ -43,6 +43,7 @@ namespace ClientProject {
 
             eventPacketSequenceAdded += TrySendNewPackets;
             this.generationTime = generationTime;
+            //this.generationTime = CheckInputData(generationTime.ToString(), x => x >= 0);   // TODO: подумать, как упростить ввод и проверку genTime,
             checkDiedNodeThread = new Thread(CheckingDiedNodes);
             diedCHeckingTime = checkDiedTime;
             addPacketsInMainSequnce = true;
@@ -174,6 +175,8 @@ namespace ClientProject {
         }
 
         
+        // TODO: в конце поднять работу generation в main. 
+        // Т.е работа не потока внутри класса, а внешняя генерация данных извне и передача уже в Client
         void Generation() {
             while (true) {
                 Thread.Sleep(generationTime);
@@ -343,10 +346,6 @@ namespace ClientProject {
             }
         }
 
-        //void ClearMainPacketsSeqqunce() {
-        //    packetsSequence.Clear();
-        //}
-
         void TransferNewDataFromAddPS() {
             PrintMessage("число пакетов addseq " + additionalPacketsSequence.Count);
             packetsSequence.AddRange(additionalPacketsSequence);
@@ -374,7 +373,6 @@ namespace ClientProject {
             if (!success) {
                 PrintMessage($"Нет доступных каналов отправки");
                 sendingAvailable = false;
-                // TODO: в данном случае подумать над генерацией события, которое стоппит отправку
             }
         }
 
@@ -413,7 +411,6 @@ namespace ClientProject {
             CloseSocket(serverSocket);
 
             Neighbors.Sort(Neighbour.CompareUnitsByPriority); // TODO: возможно сортировку перенести на сервер перед отправкой
-            //WriteFiles();
             WriteTopologyToFiles();
         }
 

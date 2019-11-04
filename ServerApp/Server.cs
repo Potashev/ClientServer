@@ -26,8 +26,8 @@ namespace ServerProject {
 
             if (createTopology) {
                 PrintMessage("Формирование топологии");
-                PrintMessage("Введите число подключений");
-                GetConnectionsCount(out int unitsCount);
+                //PrintMessage("Введите число подключений");
+                InputConnectionsCount(out int unitsCount);
                 ConnectAllForTopology(unitsCount);
             }
 
@@ -114,31 +114,64 @@ namespace ServerProject {
         }
 
         
+        
+
+        //delegate bool ValueRequirement(int value);
+
+        //int GetInputData(ValueRequirement requirement) {
+        //        int resultData = 0;
+        //        while (true) {
+        //            if (int.TryParse(InputData(), out int inputvalue) && requirement(inputvalue)) {
+        //                resultData = inputvalue;
+        //                break;
+        //            }
+        //            else {
+        //                PrintMessage("Неверный ввод, повторите попытку:");
+        //            }
+        //        }
+        //        return resultData;
+            
+        //}
+
+        //int CheckInputData(string stringValue, ValueRequirement requirement) {
+        //    if(int.TryParse(stringValue, out int inputValue) && requirement(inputValue)) {
+        //        return inputValue;
+        //    }
+        //    else {
+        //        PrintMessage("Неверный ввод, повторите попытку:");
+        //        return GetInputData(requirement);
+        //    }
+        //}
+
+        void InputConnectionsCount(out int count) {
+            count = GetInputData(x => (x > 0), "Введите число подключений:");
+        }
+
+        void InputNeighbourPriority(out int priority) {
+            priority = GetInputData(x => (x > 0 || x == -1), "Приоритет:");
+        }
+
         // TODO: Добавить проверку на дурака
-        int? InputNeibId() {
-            PrintMessage("Id:");
+        int? InputNeighbourId(int clientsCount, int clientId) {
+            string inputMessage = "Id:";
+            PrintMessage(inputMessage);
             string strId = InputData();
             if (strId == "") {
                 return null;
             }
             else {
-                int id = int.Parse(strId);
+                int id = CheckInputData(x => (x >= 0 && x <= clientsCount && x != clientId), strId, inputMessage);
                 return id;
             }
         }
 
-        void GetConnectionsCount(out int count) {
-            string strCount = InputData();
-            count = int.Parse(strCount);
-                //return count;
-        }
-
         // TODO: Добавить проверку на дурака
-        int InputNeibPriority() {
-            PrintMessage("Приоритет:");
-            int priority = int.Parse(InputData());
-            return priority;
-        }
+        //int InputNeibPriority() {
+        //    PrintMessage("Приоритет:");
+        //    //int priority = int.Parse(InputData());
+        //    int priority = GetInputData(x => (x > 0 || x == -1));
+        //    return priority;
+        //}
 
         List<Neighbour> GetNeibsForClient(TopologyClient client, List<TopologyClient> clients) {
 
@@ -147,7 +180,8 @@ namespace ServerProject {
             PrintMessage($"Для узла {clientIp} (id = {clientId}):");
             List<Neighbour> neibs = new List<Neighbour>();
             while (true) {
-                int? id = InputNeibId();
+                //PrintMessage("Id:");
+                int? id = InputNeighbourId(clients.Count, clientId);
 
                 // проверка значения id на выход из цикла
                 if(id == null) {
@@ -163,7 +197,8 @@ namespace ServerProject {
                 foreach (TopologyClient cl in clients) {
 
                     if (cl._id == id) {
-                        int priority = InputNeibPriority();
+                        PrintMessage("Приоритет:");
+                        InputNeighbourPriority(out int priority);
                         string ip = cl.GetIp();
                         int port = cl._acceptPort;
                         Neighbour n = new Neighbour(ip, priority, port);

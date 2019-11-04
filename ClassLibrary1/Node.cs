@@ -103,8 +103,6 @@ namespace ClientServerLib {
                     //byte[] resultbytes = GetResultBuffer(messageList);
                     if (size > 0) {
                         List<DataPacket> receivedPackets = GetDataFromBuffer(buffer);
-
-                        //packetsSequence.AddRange(receivedPackets);
                         AddPacketsInSequence(receivedPackets);
 
                         eventPacketSequenceAdded(receivedPackets);
@@ -196,10 +194,42 @@ namespace ClientServerLib {
             return input();
         }
 
+        protected int GetInputData(ValueRequirement requirement, string inputMessage = null) {
+            int resultData = 0;
+            while (true) {
+                if (inputMessage != null) {
+                    PrintMessage(inputMessage);
+                }
+                if (int.TryParse(InputData(), out int inputvalue) && requirement(inputvalue)) {
+                    resultData = inputvalue;
+                    break;
+                }
+                else {
+                    PrintMessage("Неверный ввод, повторите попытку.");
+                }
+            }
+            return resultData;
+
+        }
+
+        protected int CheckInputData(ValueRequirement requirement, string stringValue, string inputMessage) {
+            if (int.TryParse(stringValue, out int inputValue) && requirement(inputValue)) {
+                return inputValue;
+            }
+            else {
+                PrintMessage("Неверный ввод, повторите попытку:");
+                return GetInputData(requirement, inputMessage);
+            }
+        }
+
     }
+
+
+    
 
     public delegate string InputDelegate();
     public delegate void OutputDelegate(string message);
+    public delegate bool ValueRequirement(int value);
 
 }
 

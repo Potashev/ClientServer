@@ -18,7 +18,8 @@ namespace ClientProject
         static void Main(string[] args) {
             Console.WriteLine("\tClient!");
             Console.Write("Время генерации пакета: ");
-            int time =int.Parse(Console.ReadLine());
+            InputGenerationTime(out int time);
+
             Console.Write("Время отправки: ");
             string sendingTimeStr = Console.ReadLine();
             if (sendingTimeStr == "") {
@@ -27,6 +28,19 @@ namespace ClientProject
             int sendingTime = int.Parse(sendingTimeStr);
             Client terminal = new Client(Console.ReadLine, Console.WriteLine, time, 10000, sendingTime);
             terminal.Run();
+        }
+
+        static void InputGenerationTime(out int time) {
+            time = 0;
+            while (true) {
+                if (int.TryParse(Console.ReadLine(), out int inputTime)) {
+                    time = inputTime;
+                    break;
+                }
+                else {
+                    Console.Write("Неверный ввод, повторите попытку:");
+                }
+            }
         }
     }
 }
