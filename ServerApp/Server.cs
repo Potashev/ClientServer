@@ -13,8 +13,11 @@ namespace ServerProject {
         //static object locker = new object();    // TODO: попробовать перенести locker в SendNeibs
         private bool createTopology;
 
+        private string inConnectionsFileName = "NumberIncomingConnections.txt";
+
         public Server(InputDelegate userInput, OutputDelegate userOutput, int acceptPort, bool createTopology = false) : base(userInput, userOutput) {
 
+            // TODO: возможно от порта сервера формировать порты приема у клиентов, чтобы могло работать на одной машине
             AcceptPort = acceptPort;
             this.createTopology = createTopology;
 
@@ -28,7 +31,14 @@ namespace ServerProject {
                 //PrintMessage("Введите число подключений");
                 InputConnectionsCount(out int unitsCount);
                 ConnectAllForTopology(unitsCount);
+
+                WriteStream(inConnectionsFileName, numberIncomingConnections);
             }
+            else {
+                numberIncomingConnections = ReadStream(inConnectionsFileName);
+            }
+
+            PrintMessage($"Число входящих - {numberIncomingConnections}");  // временно
 
             PrintMessage("Прием пакетов...");
 
@@ -54,7 +64,7 @@ namespace ServerProject {
         void ConnectAllForTopology(int clientsCount) {
 
             // TODO: возможно позже здесь формировать список клиентов и передавать в методы
-
+            TopologyClient.Initialize(AcceptPort);
             List<TopologyClient> сlients = new List<TopologyClient>();
             OpenConnectForTopology(clientsCount, сlients);
             CreateTopology(сlients);
@@ -105,8 +115,8 @@ namespace ServerProject {
             string ip;
             int id;
             foreach (TopologyClient cl in clients) {
-                ip = Convert.ToString(cl._socket.RemoteEndPoint);
-                id = cl._id;
+                ip = Convert.ToString(cl.Socket.RemoteEndPoint);
+                id = cl.Id;
                 PrintMessage($"ip:port = {ip}, id = {id}");
             }
             PrintMessage("\n*id=0 - сервер");
@@ -175,7 +185,7 @@ namespace ServerProject {
         List<Neighbour> GetNeibsForClient(TopologyClient client, List<TopologyClient> clients) {
 
             string clientIp = client.GetIpPort();
-            int clientId = client._id;
+            int clientId = client.Id;
             PrintMessage($"Для узла {clientIp} (id = {clientId}):");
             List<Neighbour> neibs = new List<Neighbour>();
             while (true) {
@@ -190,16 +200,19 @@ namespace ServerProject {
                 if (id == 0) {
                     Neighbour NeibServer = new Neighbour(SERVER_IP, 1, AcceptPort);
                     neibs.Add(NeibServer);
+
+                    numberIncomingConnections++;    // TODO: проверить
+
                     continue;
                 }
 
                 foreach (TopologyClient cl in clients) {
 
-                    if (cl._id == id) {
-                        PrintMessage("Приоритет:");
+                    if (cl.Id == id) {
+                        //PrintMessage("Приоритет:");
                         InputNeighbourPriority(out int priority);
                         string ip = cl.GetIp();
-                        int port = cl._acceptPort;
+                        int port = cl.AcceptPort;
                         Neighbour n = new Neighbour(ip, priority, port);
                         neibs.Add(n);
                         break;
@@ -213,15 +226,15 @@ namespace ServerProject {
         
         void SendNeibs(TopologyClient client, byte[] buffer) {
             lock (locker) {
-                client._socket.Send(buffer);
+                client.Socket.Send(buffer);
 
 
-                string clientId = Convert.ToString(client._id);
-                client._socket.Send(Encoding.ASCII.GetBytes(clientId));
+                string clientId = Convert.ToString(client.Id);
+                client.Socket.Send(Encoding.ASCII.GetBytes(clientId));
                 // TODO: убрать либо сделать меньше
                 Thread.Sleep(100);
-                string clientAcceptPort = Convert.ToString(client._acceptPort);
-                client._socket.Send(Encoding.ASCII.GetBytes(clientAcceptPort));
+                string clientAcceptPort = Convert.ToString(client.AcceptPort);
+                client.Socket.Send(Encoding.ASCII.GetBytes(clientAcceptPort));
             }
         }
 
@@ -236,37 +249,40 @@ namespace ServerProject {
             foreach (TopologyClient cl in clients) {
                 ////cl._socket.Shutdown((SocketShutdown.Both));
                 //cl._socket.Close();
-                CloseSocket(cl._socket);
+                CloseSocket(cl.Socket);
             }
         }
     }
 
     class TopologyClient {
-        public Socket _socket;
-        public int _id;
-        // порт приема каждого узла (теперь можно на одном компе запускать несколько клиентов)
-        public int _acceptPort;
+        public Socket Socket { get; set; }
+        public int Id { get; set; }
+        public int AcceptPort { get; set; }
 
-        static int clientCounter = 1; // серв - id 0
+        private static int clientCounter = 1;
+        private static int acceptPortCounter;
 
-        static int acceptPortCounter = 660;
+        public static void Initialize (int ServerAcceptPort) {
+            acceptPortCounter = ServerAcceptPort + 1;
+        }
 
         public TopologyClient(Socket socket) {
-            _socket = socket;
-            _id = clientCounter;
-            _acceptPort = acceptPortCounter;
+            Socket = socket;
+            Id = clientCounter;
+            AcceptPort = acceptPortCounter;
+
             clientCounter++;
             acceptPortCounter++;
         }
 
         public string GetIpPort() {
-            string ipPort = Convert.ToString(_socket.RemoteEndPoint);
+            string ipPort = Convert.ToString(Socket.RemoteEndPoint);
             return ipPort;
         }
 
         // мб найти получше
         public string GetIp() {
-            string ipAndPort = Convert.ToString(_socket.RemoteEndPoint);
+            string ipAndPort = Convert.ToString(Socket.RemoteEndPoint);
             int index = ipAndPort.IndexOf(":");
             string ip = ipAndPort.Remove(index);
             return ip;

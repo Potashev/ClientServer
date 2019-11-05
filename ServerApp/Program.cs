@@ -27,7 +27,7 @@ namespace ServerProject
                 createTopology = true;
             }
 
-            Server terminal = new Server(Console.ReadLine, Console.WriteLine, 700, createTopology);
+            Server terminal = new Server(Console.ReadLine, Console.WriteLine, 660, createTopology);
 
             terminal.Run();
         }

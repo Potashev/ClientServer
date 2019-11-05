@@ -44,7 +44,7 @@ namespace ClientServerLib {
         }
 
         public bool IsForReceiving() {
-            if (Priority == 1) {
+            if (Priority == -1) {   // было с какого-то 1 - проверить
                 return true;
             }
             else {

@@ -12,14 +12,30 @@ using System.Threading.Tasks;
 namespace ClientServerLib {
     public abstract class Node {
 
+        protected int numberIncomingConnections;
+
         protected const string SERVER_IP = "192.168.1.106";
         protected const int SERVER_PORT_FOR_TOPOLOGY = 999;
 
+        private int acceptPort;
+
         protected IPAddress Ip { get; set; }
-        protected int AcceptPort { get; set; }
+        protected int AcceptPort {
+            get {
+                return acceptPort;
+            }
+            set {
+                if (value > 0) {
+                    acceptPort = value;
+                }
+                else {
+                    acceptPort = 700;
+                }
+            }
+        }
 
+        
 
-        protected List<AcceptConnectionInfo> InConnections = new List<AcceptConnectionInfo>();
         protected List<DataPacket> packetsSequence = new List<DataPacket>();
 
         // TODO: проверить readonly
@@ -32,6 +48,8 @@ namespace ClientServerLib {
         protected Node(InputDelegate userInput, OutputDelegate userOutput) {
             input = userInput;
             output = userOutput;
+
+            numberIncomingConnections = 0;  // TODO: проверить
 
             Ip = GetIpAdress();
 
@@ -74,7 +92,7 @@ namespace ClientServerLib {
             Socket acceptSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             //acceptSocket.Bind(new IPEndPoint(IPAddress.Parse(SERVER_IP), 700));
             acceptSocket.Bind(new IPEndPoint(Ip, AcceptPort));
-            acceptSocket.Listen(1); // здесь параметр будет число соседов сервера по топологии (в теории)
+            acceptSocket.Listen(numberIncomingConnections); //TODO: проверить  // здесь параметр будет число соседов сервера по топологии (в теории)
 
             while (true) {
                 try {

@@ -91,6 +91,17 @@ namespace ClientProject {
             }
         }
 
+        void SetNumberIncomingConnections() {
+            int counter = 0;
+            foreach(Neighbour neighbour in Neighbors) {
+                if (neighbour.IsForReceiving()) {
+                    counter++;
+                }
+            }
+            PrintMessage($"Число входящих - {counter}");
+            numberIncomingConnections = counter;
+        }
+
         public override void Run() {
 
             if (File.Exists(topologyFileName)) {
@@ -107,6 +118,9 @@ namespace ClientProject {
 
             ShowConfiguration();
             ShowNeighbours();
+
+            SetNumberIncomingConnections();
+
             FindNeighbourForSending();
 
             PrintMessage("Начать?");
