@@ -14,7 +14,7 @@ namespace ClientServerLib {
 
         protected int numberIncomingConnections;
 
-        protected const string SERVER_IP = "192.168.1.106";
+        protected const string SERVER_IP = "192.168.1.102";
         protected const int SERVER_PORT_FOR_TOPOLOGY = 999;
 
         private int acceptPort;
@@ -162,21 +162,38 @@ namespace ClientServerLib {
 
 
         // пример полиморфизма (апкаста): принимает memorystream и filestream
-        protected void SerializeJson(List<Neighbour> neighbours, Stream stream) {
-            DataContractJsonSerializer jsonSerializer = new DataContractJsonSerializer(typeof(List<Neighbour>));
-            jsonSerializer.WriteObject(stream, neighbours);
+        //protected void SerializeJson(List<Neighbour> neighbours, Stream stream) {
+        //    DataContractJsonSerializer jsonSerializer = new DataContractJsonSerializer(typeof(List<Neighbour>));
+        //    jsonSerializer.WriteObject(stream, neighbours); //TODO: проверить отправку у клиента, возможно подогнать под deserialize
+        //}
+
+        protected void SerializeJson<T>(List<T> objectsList, Stream stream) {
+            DataContractJsonSerializer jsonSerializer = new DataContractJsonSerializer(typeof(List<T>));    
+            jsonSerializer.WriteObject(stream, objectsList);    // по идее здесь try не нужен тк список так и так сериализуется?
         }
 
         protected List<T> DeserializeJson<T>(Stream stream) {
             DataContractJsonSerializer jsonSerializer = new DataContractJsonSerializer(typeof(List<T>));
-            List<T> resultList = (List<T>)jsonSerializer.ReadObject(stream);
-            return resultList;
+            try {
+                List<T> resultList = (List<T>)jsonSerializer.ReadObject(stream);
+                return resultList;
+            }
+            catch(Exception ex) {
+                PrintMessage(ex.Message);
+            }
+            return new List<T>();
         }
 
         protected int ReadStream(string fileName) {
-            StreamReader stream = new StreamReader(fileName);
-            int result = Convert.ToInt32(stream.ReadLine());
-            stream.Close();
+            int result = 0;
+            try {
+                StreamReader stream = new StreamReader(fileName);
+                result = Convert.ToInt32(stream.ReadLine());
+                stream.Close();
+            }
+            catch(Exception ex) {
+                PrintMessage(ex.Message);
+            }
             return result;
         }
 

@@ -29,57 +29,57 @@ namespace ClientServerLib {
         }
 
         // 1 объект
-        public static byte[] GetBytes(DataPacket packet) {
-            DataContractJsonSerializer serializer = new DataContractJsonSerializer(typeof(DataPacket));
-            MemoryStream stream = new MemoryStream();
-            serializer.WriteObject(stream, packet);
-            byte[] bytesStream = stream.GetBuffer();// получаем буфер всего потока, а не только объекта (256)
-            stream.Close(); // возможно закрытие потока автоматом при завершении метода
+        //public static byte[] GetBytes(DataPacket packet) {
+        //    DataContractJsonSerializer serializer = new DataContractJsonSerializer(typeof(DataPacket));
+        //    MemoryStream stream = new MemoryStream();
+        //    serializer.WriteObject(stream, packet);
+        //    byte[] bytesStream = stream.GetBuffer();// получаем буфер всего потока, а не только объекта (256)
+        //    stream.Close(); // возможно закрытие потока автоматом при завершении метода
 
-            // получаем массив байт одного объекта (36)
-            int bytesCount = 0;
-            while (bytesStream[bytesCount] != 0) {
-                bytesCount++;
-            }
-            byte[] bytesPacket = new byte[bytesCount];
-            Array.Copy(bytesStream, bytesPacket, bytesCount);
+        //    // получаем массив байт одного объекта (36)
+        //    int bytesCount = 0;
+        //    while (bytesStream[bytesCount] != 0) {
+        //        bytesCount++;
+        //    }
+        //    byte[] bytesPacket = new byte[bytesCount];
+        //    Array.Copy(bytesStream, bytesPacket, bytesCount);
 
 
-            //stream.Close(); // возможно закрытие потока автоматом при завершении метода
-            return bytesPacket;
-        }
+        //    //stream.Close(); // возможно закрытие потока автоматом при завершении метода
+        //    return bytesPacket;
+        //}
 
         // TODO: ПЕРЕНЕСТИ
         static protected object locker = new object();
 
         // массив объектов
-        public static byte[] GetBytes(List<DataPacket> packets) {
-            //lock (locker) {
-                DataContractJsonSerializer serializer = new DataContractJsonSerializer(typeof(List<DataPacket>));
-                MemoryStream stream = new MemoryStream();
-                serializer.WriteObject(stream, packets);
-                byte[] bytesStream = stream.GetBuffer();// получаем буфер всего потока, а не только объекта (256)
-                stream.Close(); // возможно закрытие потока автоматом при завершении метода
+        //public static byte[] GetBytes(List<DataPacket> packets) {
+        //    //lock (locker) {
+        //        DataContractJsonSerializer serializer = new DataContractJsonSerializer(typeof(List<DataPacket>));
+        //        MemoryStream stream = new MemoryStream();
+        //        serializer.WriteObject(stream, packets);
+        //        byte[] bytesStream = stream.GetBuffer();// получаем буфер всего потока, а не только объекта (256)
+        //        stream.Close(); // возможно закрытие потока автоматом при завершении метода
 
-                // получаем массив байт одного объекта (36)
-                int bytesCount = 0;
-                while (bytesStream[bytesCount] != 0) {
-                    bytesCount++;
-                }
-                byte[] bytesPacket = new byte[bytesCount];
-                Array.Copy(bytesStream, bytesPacket, bytesCount);
+        //        // получаем массив байт одного объекта (36)
+        //        int bytesCount = 0;
+        //        while (bytesStream[bytesCount] != 0) {
+        //            bytesCount++;
+        //        }
+        //        byte[] bytesPacket = new byte[bytesCount];
+        //        Array.Copy(bytesStream, bytesPacket, bytesCount);
 
 
-                //stream.Close(); // возможно закрытие потока автоматом при завершении метода
-                return bytesPacket;
-            //}
-        }
+        //        //stream.Close(); // возможно закрытие потока автоматом при завершении метода
+        //        return bytesPacket;
+        //    //}
+        //}
 
         // TODO: сделать адекватным
-        public static int GetObjectSize() {
-            int bytesInObject = GetBytes(new DataPacket()).Length;
-            return bytesInObject; // размер на 2 ьайта больше /=
-        }
+        //public static int GetObjectSize() {
+        //    int bytesInObject = GetBytes(new DataPacket()).Length;
+        //    return bytesInObject; // размер на 2 ьайта больше /=
+        //}
 
         public DataPacket() { }
 

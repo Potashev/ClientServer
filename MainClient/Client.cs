@@ -69,7 +69,9 @@ namespace ClientProject {
         string portFileName = @"port.txt";
 
         public Client(InputDelegate userInput, OutputDelegate userOutput, int generationTime, int checkDiedTime, int TIME) : base(userInput, userOutput) {
+
             
+
             TimeGeneration = generationTime;
             TimeCheckingDied = checkDiedTime;
             //this.generationTime = CheckInputData(generationTime.ToString(), x => x >= 0);   // TODO: подумать, как упростить ввод и проверку genTime,
@@ -80,6 +82,20 @@ namespace ClientProject {
             SENDTIME = TIME;
 
         }
+
+        public Client(InputDelegate userInput, OutputDelegate userOutput) : base(userInput, userOutput) {
+            
+            TimeGeneration = GetInputData(x=>x>0, "Время генерации пакета: ");
+            TimeCheckingDied = 10000;
+            //this.generationTime = CheckInputData(generationTime.ToString(), x => x >= 0);   // TODO: подумать, как упростить ввод и проверку genTime,
+            checkDiedNodeThread = new Thread(CheckingDiedNodes);
+            addPacketsInMainSequnce = true;
+            eventPacketSequenceAdded += TrySendNewPackets;
+
+            SENDTIME = 0;
+
+        }
+
 
         // метод заглушка для обработки события на клиенте
         void TrySendNewPackets(List<DataPacket> packets = null) {
@@ -106,7 +122,7 @@ namespace ClientProject {
 
             if (File.Exists(topologyFileName)) {
                 PrintMessage("Восстановление топологии");
-                GetTopologyFromFile();
+                GetTopologyFromFile();  // TODO: проверить runtimeex у чтения файлов
             }
             else {
                 PrintMessage("Подключение к серверу для получения топологии");
@@ -251,19 +267,7 @@ namespace ClientProject {
             }
         }
 
-        // TODO: разобраться с модификатором
-        override protected void AddPacketsInSequence(List<DataPacket> packets) {
-            // TODO: ДОБАВИТЬ LOCK
-            //lock (locker) {
-                if (addPacketsInMainSequnce) {
-                    packetsSequence.AddRange(packets);
-                }
-                else {
-                    PrintMessage($"ДОБАВЛЯЕМ ПАКЕТЫ В ADDSEQ {packets.Count} пакетов !!!!!");
-                    additionalPacketsSequence.AddRange(packets);
-                }
-        //}
-    }
+       
 
         
 
@@ -276,15 +280,20 @@ namespace ClientProject {
 
         
 
-        byte[] GetBufferForSending() {
+        //byte[] GetBufferForSending() {
 
-            // БЛОКИРОВКА ТЕСТОВАЯ
-            byte[] bytesPacket;
-            lock (locker) {
-                bytesPacket = DataPacket.GetBytes(packetsSequence);
-            }
-            return bytesPacket;
-        }
+        //    //MemoryStream memoryStream = new MemoryStream();
+        //    //SerializeJson(neibs, memoryStream);
+        //    //buffer = memoryStream.GetBuffer();
+        //    //memoryStream.Close();
+
+        //    // БЛОКИРОВКА ТЕСТОВАЯ
+        //    byte[] bytesPacket;
+        //    lock (locker) {
+        //        bytesPacket = DataPacket.GetBytes(packetsSequence);
+        //    }
+        //    return bytesPacket;
+        //}
 
         //void TryLifeUpConnection(Neighbour neighbour, out bool successLifeUp) {
         //    lock (locker) {
@@ -351,30 +360,56 @@ namespace ClientProject {
         //    }
         //}
 
+        // TODO: разобраться с модификатором
+        override protected void AddPacketsInSequence(List<DataPacket> packets) {
+            // TODO: ДОБАВИТЬ LOCK
+            lock (locker) {
+                if (addPacketsInMainSequnce) {
+                    packetsSequence.AddRange(packets);
+                }
+                else {
+                    PrintMessage($"ДОБАВЛЯЕМ ПАКЕТЫ В ADDSEQ {packets.Count} пакетов !!!!!");
+                    additionalPacketsSequence.AddRange(packets);
+                }
+            }
+            //Thread.Sleep(1);
+        }
+
+        static protected object locker2 = new object();
+
         void SendingProccess() {
             //SelectAddPacketSeq();
 
             // TODO: возможно добавить проверку на пустоту PS, чтобы не отправлять его (если не синхронизирую добавление в PS)
-
-            //lock (locker) {
-                addPacketsInMainSequnce = false;
-                GetSendBuffer(out byte[] sendBuffer);
-                SendBuffer(sendBuffer, out bool successSending);
-                PrintMessage("Число пакетов в PS после отправки " + packetsSequence.Count);
-                if (successSending) {
-                    //ClearMainPacketsSeqqunce();
-                    packetsSequence.Clear();
+            if (packetsSequence.Count > 0) {
+                lock (locker) {
+                    addPacketsInMainSequnce = false;
+                    GetSendBuffer(out byte[] sendBuffer);
+                    SendBuffer(sendBuffer, out bool successSending);
+                    PrintMessage("Число пакетов в PS после отправки " + packetsSequence.Count);
+                    if (successSending) {
+                        //ClearMainPacketsSeqqunce();
+                        packetsSequence.Clear();
+                    }
+                    
+                    //SelectMainPs();
+                    Thread.Sleep(SENDTIME);
+                    addPacketsInMainSequnce = true;
                 }
-                //SelectMainPs();
-                Thread.Sleep(SENDTIME);
-                addPacketsInMainSequnce = true;
-                // TODO: возможно перенести окончание lock сюда - после снятия запрета?
-                TransferNewDataFromAddPS();
-            //}
+                    // TODO: возможно перенести окончание lock сюда - после снятия запрета?
+                    TransferNewDataFromAddPS();
+                //}
+            }
+            //Thread.Sleep(1);
         }
 
         void GetSendBuffer(out byte[] sendBuffer) {
-            sendBuffer = GetBufferForSending();
+            MemoryStream memoryStream = new MemoryStream();
+            SerializeJson(packetsSequence, memoryStream);
+            sendBuffer = memoryStream.GetBuffer();
+            memoryStream.Close();
+
+            //sendBuffer = GetBufferForSending();
         }
 
         void SendBuffer(byte[] sendBuffer, out bool successSending) {
@@ -445,24 +480,35 @@ namespace ClientProject {
         }
 
         void GetTopologyFromFile() {
-            FileStream fsReading = new FileStream(topologyFileName, FileMode.OpenOrCreate);
-            Neighbors = DeserializeJson<Neighbour>(fsReading);
-            fsReading.Close();  // нужно ли закрывать?
+            //try {
+                FileStream fsReading = new FileStream(topologyFileName, FileMode.OpenOrCreate);
+                Neighbors = DeserializeJson<Neighbour>(fsReading);
+                fsReading.Close();  // нужно ли закрывать?
 
-            clientId = ReadStream(idFileName);
-            AcceptPort = ReadStream(portFileName);
+                clientId = ReadStream(idFileName);
+                AcceptPort = ReadStream(portFileName);
+            //}
+            //catch(Exception ex) {
+            //    PrintMessage(ex.Message);
+            //}
         }
 
         void GetTopologyFromServer() {
-            ConnectToServer(out Socket serverSocket);
-            GetNeibsFromServer(serverSocket);
-            GetUnitIdFromServer(serverSocket);
-            GetAcceptPortFromServer(serverSocket);
-            //serverSocket.Close();
-            CloseSocket(serverSocket);
+            try {   //TODO: мб try перенести пониже - в методы, хотя если воспринимать получение топологии как транзакцию, то оставить как есть
+                ConnectToServer(out Socket serverSocket);
+                GetNeibsFromServer(serverSocket);
+                GetUnitIdFromServer(serverSocket);
+                GetAcceptPortFromServer(serverSocket);
 
-            Neighbors.Sort(Neighbour.CompareUnitsByPriority); // TODO: возможно сортировку перенести на сервер перед отправкой
-            WriteTopologyToFiles();
+                //serverSocket.Close();
+                CloseSocket(serverSocket);  //TODO: возможно закрытие перенести в finally
+                Neighbors.Sort(Neighbour.CompareUnitsByPriority); // TODO: возможно сортировку перенести на сервер перед отправкой
+                WriteTopologyToFiles();
+            }
+            catch(Exception ex) {
+                //PrintMessage("Соединение с сервером было потеряно.");
+                PrintMessage(ex.Message);
+            }
         }
 
         void ConnectToServer(out Socket socket) {

@@ -102,11 +102,12 @@ namespace ServerProject {
         void CreateTopology(List<TopologyClient> clients) {
             ShowClients(clients);
             foreach (TopologyClient client in clients) {
+
                 List<Neighbour> Neibs = GetNeibsForClient(client, clients);
                 ConvertNeibsForSending(Neibs, out byte[] buffer);
                 Neibs.Clear();
                 SendNeibs(client, buffer);
-                PrintMessage("Топология отправлена " + client.GetIp());
+                //PrintMessage("Топология отправлена " + client.GetIp());
             }
         }
 
@@ -157,7 +158,10 @@ namespace ServerProject {
         }
 
         void InputNeighbourPriority(out int priority) {
-            priority = GetInputData(x => (x > 0 || x == -1), "Приоритет:");
+            //priority = GetInputData(x => (x > 0 || x == -1), "Приоритет:");
+            PrintMessage(Neighbour.GetInputValueInfo());
+            priority = GetInputData(x => (x >= 0), "Приоритет:");
+
         }
 
         // TODO: Добавить проверку на дурака
@@ -224,18 +228,28 @@ namespace ServerProject {
             return neibs;
         }
         
-        void SendNeibs(TopologyClient client, byte[] buffer) {
-            lock (locker) {
-                client.Socket.Send(buffer);
+        void SendNeibs(TopologyClient client, byte[] byteNeighbours) {
 
+            // TODO: добавить try, если клиент отстегнется
 
+            //lock (locker) {
+            try {
+                client.Socket.Send(byteNeighbours);
                 string clientId = Convert.ToString(client.Id);
                 client.Socket.Send(Encoding.ASCII.GetBytes(clientId));
                 // TODO: убрать либо сделать меньше
                 Thread.Sleep(100);
                 string clientAcceptPort = Convert.ToString(client.AcceptPort);
                 client.Socket.Send(Encoding.ASCII.GetBytes(clientAcceptPort));
+                //}
+
+                PrintMessage("Топология отправлена " + client.GetIp());
             }
+            catch(Exception ex) {
+                PrintMessage($"Соединение с клиентом (id={client.Id}) было потеряно.");
+                PrintMessage(ex.Message);
+            }
+
         }
 
         void ConvertNeibsForSending(List<Neighbour> neibs, out byte[] buffer) {

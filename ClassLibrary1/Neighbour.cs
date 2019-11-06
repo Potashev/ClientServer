@@ -27,6 +27,14 @@ namespace ClientServerLib {
         public bool IsDied { get; set; }
         //public bool died;       // нужны только у узлов отправки
 
+        private static int receivingPriorityValue = 0;
+        
+        public static string GetInputValueInfo() {
+            string messageInfo =
+                $"Допустимые значения приоритета: {receivingPriorityValue} - прием, 1,2,3.. - отправка.";
+            return messageInfo;
+        }
+
         public Neighbour(string addr, int weight, int port) {
             Ip = addr;
             Priority = weight;
@@ -44,7 +52,7 @@ namespace ClientServerLib {
         }
 
         public bool IsForReceiving() {
-            if (Priority == -1) {   // было с какого-то 1 - проверить
+            if (Priority == receivingPriorityValue) {   // было с какого-то 1 - проверить
                 return true;
             }
             else {
@@ -72,6 +80,7 @@ namespace ClientServerLib {
 
         // ф-я сравнения для сортировки списка по возрастанию (-1, -1... 1, 2...)
         // мб найти другую сортировку ( 1, 2... -1, -1...)
+        // TODO: если приоритет на получение стал 0, то мб применить упрощенную сортировку списка (без этого метода)
         public static int CompareUnitsByPriority(Neighbour x, Neighbour y) {
             if (x.Priority == y.Priority)
                 return 0;
