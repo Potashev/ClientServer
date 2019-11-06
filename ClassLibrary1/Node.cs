@@ -97,28 +97,32 @@ namespace ClientServerLib {
             while (true) {
                 try {
                     var listener = acceptSocket.Accept();
-                    var buffer = new byte[1000];
-                    List<byte[]> messageList = new List<byte[]>();  // содержит все куски сообщения
-                                                                    //var acumBuffer = new byte[10000];
-                    var size = 0;
-                    //var messageSize = 0;
-                    //var data = new StringBuilder();
+                    var buffer = new byte[256];
 
-                    // РАБОТАЕТ ЕСЛИ СООБЩЕНИЕ 1 КУСКОМ (1 ИТЕРАЦИЯ ЦИКЛА)
+                    List<byte> messageList = new List<byte>();
+
+                    var size = 0;
+                    int cnt = 0;
+
+                    // РАБОТАЕТ как с одним куском, так и с множеством (любое число пакетов в сообщении)
                     do {
                         size = listener.Receive(buffer);
-                        //messageList.Add(buffer);
+                        messageList.AddRange(buffer);
 
+                        cnt++;
+                        
                     } while (listener.Available > 0);
                     listener.Shutdown(SocketShutdown.Both);
                     listener.Close();
 
+                    PrintMessage("число кусков " + cnt);
 
                     PrintMessage("Получены данные");
 
                     //byte[] resultbytes = GetResultBuffer(messageList);
+                    byte[] resultbytes = messageList.ToArray();
                     if (size > 0) {
-                        List<DataPacket> receivedPackets = GetDataFromBuffer(buffer);
+                        List<DataPacket> receivedPackets = GetDataFromBuffer(resultbytes);
                         AddPacketsInSequence(receivedPackets);
 
                         eventPacketSequenceAdded(receivedPackets);
