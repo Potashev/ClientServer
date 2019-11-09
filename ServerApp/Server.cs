@@ -27,15 +27,13 @@ namespace ServerProject {
         public override void Run() {
 
             if (createTopology) {
-                PrintMessage("Формирование топологии");
-                //PrintMessage("Введите число подключений");
-                InputConnectionsCount(out int unitsCount);
-                ConnectAllForTopology(unitsCount);
-
-                WriteStream(inConnectionsFileName, numberIncomingConnections);
+                PrintMessage("Формирование топологии.");
+                InputConnectionsCount(out int numberClientsInTopology);
+                CreateTopology(numberClientsInTopology);
+                WriteNumberConnectionsToServer();
             }
             else {
-                numberIncomingConnections = ReadStream(inConnectionsFileName);
+                GetNumberConnectionsToServer();
             }
 
             PrintMessage($"Число входящих - {numberIncomingConnections}");  // временно
@@ -44,6 +42,15 @@ namespace ServerProject {
 
             ReceivingProccess();
         }
+
+        void WriteNumberConnectionsToServer() {
+            WriteStream(inConnectionsFileName, numberIncomingConnections);
+        }
+
+        void GetNumberConnectionsToServer() {
+            numberIncomingConnections = ReadStream(inConnectionsFileName);
+        }
+
 
         void PrintNewPackets(List<DataPacket> packets) {
                 foreach (DataPacket p in packets)
@@ -61,53 +68,45 @@ namespace ServerProject {
         //}
         
 
-        void ConnectAllForTopology(int clientsCount) {
-
+        void CreateTopology(int clientsCount) {
             // TODO: возможно позже здесь формировать список клиентов и передавать в методы
-            TopologyClient.Initialize(AcceptPort);
-            List<TopologyClient> сlients = new List<TopologyClient>();
-            OpenConnectForTopology(clientsCount, сlients);
-            CreateTopology(сlients);
-            CloseConnectionForTopology(сlients);
-            сlients.Clear();
+            CreateClietnsList(out List<TopologyClient> clients);
+            OpenConnectForTopology(clientsCount, clients);  // подключить всех клиентов
+            ShowClients(clients);                           // показать список клиентов
+            DefineClientsCommunications(clients);           // ввод соседей клиента и отправка их ему
+            CloseConnectionForTopology(clients);            // закрыть соединение
+            clients.Clear();
+        }
 
+        void CreateClietnsList(out List<TopologyClient> clients) {
+            TopologyClient.SetStartPortValue(AcceptPort);   //TODO: подумать, можно ли чем заменить
+            clients = new List<TopologyClient>();
         }
 
         void OpenConnectForTopology(int clientsCount, List<TopologyClient> clients) {
-            //Socket serverSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            //serverSocket.Bind(new IPEndPoint(IPAddress.Any, SERVER_PORT_FOR_TOPOLOGY));
-            //serverSocket.Listen(1);
-
-
-            RunAcceptSocket(SERVER_PORT_FOR_TOPOLOGY, out Socket serverSocket);
-
+            RunAcceptSocket(out Socket serverAcceptSocket, clientsCount, SERVER_PORT_FOR_TOPOLOGY);
             PrintMessage($"Ожидаемое число подключений: {clientsCount}");
             PrintMessage("Ожидание подключений...");
             for (int i = 0; i < clientsCount; i++) {
-                Socket socket = serverSocket.Accept();
-                PrintMessage("Новое подключение");
+                Socket socket = serverAcceptSocket.Accept();
                 TopologyClient newClient = new TopologyClient(socket);
                 clients.Add(newClient);
+                PrintMessage("Новое подключение.");
             }
-            PrintMessage("Все подключились");
-
-            ////serverSocket.Shutdown(SocketShutdown.Both);
-            //serverSocket.Close();
-
-            CloseSocket(serverSocket);
+            PrintMessage("Все узлы подключились.");
+            //CloseSocket(serverAcceptSocket);
+            serverAcceptSocket.Close();
 
 
         }
 
-        void CreateTopology(List<TopologyClient> clients) {
-            ShowClients(clients);
+        void DefineClientsCommunications(List<TopologyClient> clients) {
             foreach (TopologyClient client in clients) {
-
-                List<Neighbour> Neibs = GetNeibsForClient(client, clients);
-                ConvertNeibsForSending(Neibs, out byte[] buffer);
-                Neibs.Clear();
-                SendNeibs(client, buffer);
-                //PrintMessage("Топология отправлена " + client.GetIp());
+                var Neighbours = GetNeighboursForClient(client, clients);
+                ConvertNeighboursForSending(Neighbours, out byte[] byteNeighbours);
+                Neighbours.Clear();
+                SendData(client, byteNeighbours);
+                PrintMessage("Топология отправлена " + client.GetIp());
             }
         }
 
@@ -186,7 +185,7 @@ namespace ServerProject {
         //    return priority;
         //}
 
-        List<Neighbour> GetNeibsForClient(TopologyClient client, List<TopologyClient> clients) {
+        List<Neighbour> GetNeighboursForClient(TopologyClient client, List<TopologyClient> clients) {
 
             string clientIp = client.GetIpPort();
             int clientId = client.Id;
@@ -228,22 +227,15 @@ namespace ServerProject {
             return neibs;
         }
         
-        void SendNeibs(TopologyClient client, byte[] byteNeighbours) {
-
-            // TODO: добавить try, если клиент отстегнется
-
-            //lock (locker) {
+        void SendData(TopologyClient client, byte[] byteNeighbours) {
             try {
                 client.Socket.Send(byteNeighbours);
-                string clientId = Convert.ToString(client.Id);
-                client.Socket.Send(Encoding.ASCII.GetBytes(clientId));
-                // TODO: убрать либо сделать меньше
-                Thread.Sleep(100);
-                string clientAcceptPort = Convert.ToString(client.AcceptPort);
-                client.Socket.Send(Encoding.ASCII.GetBytes(clientAcceptPort));
-                //}
 
-                PrintMessage("Топология отправлена " + client.GetIp());
+                var clientId = client.Id.ToString();
+                client.Socket.Send(Encoding.ASCII.GetBytes(clientId));
+                Thread.Sleep(100);
+                var clientAcceptPort = client.AcceptPort.ToString();
+                client.Socket.Send(Encoding.ASCII.GetBytes(clientAcceptPort));
             }
             catch(Exception ex) {
                 PrintMessage($"Соединение с клиентом (id={client.Id}) было потеряно.");
@@ -252,18 +244,16 @@ namespace ServerProject {
 
         }
 
-        void ConvertNeibsForSending(List<Neighbour> neibs, out byte[] buffer) {
+        void ConvertNeighboursForSending(List<Neighbour> Neighbours, out byte[] buffer) {
             MemoryStream memoryStream = new MemoryStream();
-            SerializeJson(neibs, memoryStream);
+            SerializeJson(Neighbours, memoryStream);
             buffer = memoryStream.GetBuffer();
             memoryStream.Close();
         }
 
         void CloseConnectionForTopology(List<TopologyClient> clients) {
-            foreach (TopologyClient cl in clients) {
-                ////cl._socket.Shutdown((SocketShutdown.Both));
-                //cl._socket.Close();
-                CloseSocket(cl.Socket);
+            foreach (TopologyClient client in clients) {
+                client.Socket.Close();
             }
         }
     }
@@ -276,7 +266,7 @@ namespace ServerProject {
         private static int clientCounter = 1;
         private static int acceptPortCounter;
 
-        public static void Initialize (int ServerAcceptPort) {
+        public static void SetStartPortValue (int ServerAcceptPort) {
             acceptPortCounter = ServerAcceptPort + 1;
         }
 

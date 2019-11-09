@@ -14,7 +14,7 @@ namespace ClientServerLib {
 
         protected int numberIncomingConnections;
 
-        protected const string SERVER_IP = "192.168.1.102";
+        protected const string SERVER_IP = "192.168.1.104";
         protected const int SERVER_PORT_FOR_TOPOLOGY = 999;
 
         private int acceptPort;
@@ -66,19 +66,20 @@ namespace ClientServerLib {
         // TODO: возможно вместо виртуально сервера добавить интерфейс с Run()
         public abstract void Run();
 
-        static protected void RunAcceptSocket(int acceptPort, out Socket acceptSocket) {
+        // TODO: проверить все использования метода, и возможно добавить параметр число подключений для Listen
+        protected void RunAcceptSocket(out Socket acceptSocket, int numberConnections, int port) {
             acceptSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            acceptSocket.Bind(new IPEndPoint(IPAddress.Any, acceptPort));
-            acceptSocket.Listen(1);             // у меня аргумент не влиял на размер очереди
+            acceptSocket.Bind(new IPEndPoint(Ip, port));
+            acceptSocket.Listen(numberConnections);
         }
 
-        static protected void CloseSocket(Socket socket) {
-            // TODO: разобраться почему на shutdown ловлю исключение
-            // (возможно связано с тем, что shutdown вызываю с обоих сторон)
+        //static protected void CloseSocket(Socket socket) {
+        //    // TODO: разобраться почему на shutdown ловлю исключение
+        //    // (возможно связано с тем, что shutdown вызываю с обоих сторон)
 
-            //socket.Shutdown(SocketShutdown.Both);
-            socket.Close();
-        }
+        //    //socket.Shutdown(SocketShutdown.Both);
+        //    socket.Close();
+        //}
 
         public delegate void PacketSequenceState(List<DataPacket> addedPackets);
         public event PacketSequenceState eventPacketSequenceAdded;
@@ -89,40 +90,28 @@ namespace ClientServerLib {
         }
 
         protected void ReceivingProccess() {
-            Socket acceptSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-            //acceptSocket.Bind(new IPEndPoint(IPAddress.Parse(SERVER_IP), 700));
-            acceptSocket.Bind(new IPEndPoint(Ip, AcceptPort));
-            acceptSocket.Listen(numberIncomingConnections); //TODO: проверить  // здесь параметр будет число соседов сервера по топологии (в теории)
-
+            RunAcceptSocket(out Socket acceptSocket, numberIncomingConnections, AcceptPort);
             while (true) {
                 try {
                     var listener = acceptSocket.Accept();
                     var buffer = new byte[256];
-
-                    List<byte> messageList = new List<byte>();
+                    var acumBuffer = new List<byte>();
 
                     var size = 0;
-                    int cnt = 0;
 
                     // РАБОТАЕТ как с одним куском, так и с множеством (любое число пакетов в сообщении)
                     do {
                         size = listener.Receive(buffer);
-                        messageList.AddRange(buffer);
-
-                        cnt++;
-                        
+                        acumBuffer.AddRange(buffer);
                     } while (listener.Available > 0);
+
                     listener.Shutdown(SocketShutdown.Both);
-                    listener.Close();
+                    listener.Close();   //TODO: ПОМЕНЯТЬ НА CLOSESOCKET?
+                    //CloseSocket(listener);
 
-                    PrintMessage("число кусков " + cnt);
-
-                    PrintMessage("Получены данные");
-
-                    //byte[] resultbytes = GetResultBuffer(messageList);
-                    byte[] resultbytes = messageList.ToArray();
+                    PrintMessage("Получены данные.");
                     if (size > 0) {
-                        List<DataPacket> receivedPackets = GetDataFromBuffer(resultbytes);
+                        List<DataPacket> receivedPackets = GetDataFromBuffer(acumBuffer.ToArray());
                         AddPacketsInSequence(receivedPackets);
 
                         eventPacketSequenceAdded(receivedPackets);
@@ -138,20 +127,6 @@ namespace ClientServerLib {
             }
         }
 
-        protected byte[] GetResultBuffer(List<byte[]> msgList) {
-            int size = 0;
-            foreach(byte[] b in msgList) {
-                size += b.Length;
-            }
-            byte[] resBuf = new byte[size];
-            int index = 0;
-            foreach(byte[] b in msgList) {
-                Array.Copy(b, 0, resBuf, index,b.Length);
-                index += b.Length;
-            }
-            return resBuf;
-        }
-
         protected List<DataPacket> GetDataFromBuffer(byte[] buffer) {
             byte[] streamBuffer = new byte[BytesInCollection(buffer)];
             // TODO: возможно поменять на array.(copy)
@@ -164,16 +139,9 @@ namespace ClientServerLib {
             return packets;
         }
 
-
-        // пример полиморфизма (апкаста): принимает memorystream и filestream
-        //protected void SerializeJson(List<Neighbour> neighbours, Stream stream) {
-        //    DataContractJsonSerializer jsonSerializer = new DataContractJsonSerializer(typeof(List<Neighbour>));
-        //    jsonSerializer.WriteObject(stream, neighbours); //TODO: проверить отправку у клиента, возможно подогнать под deserialize
-        //}
-
         protected void SerializeJson<T>(List<T> objectsList, Stream stream) {
             DataContractJsonSerializer jsonSerializer = new DataContractJsonSerializer(typeof(List<T>));    
-            jsonSerializer.WriteObject(stream, objectsList);    // по идее здесь try не нужен тк список так и так сериализуется?
+            jsonSerializer.WriteObject(stream, objectsList);    // try нужен (был runtimeex на больших скоростях)
         }
 
         protected List<T> DeserializeJson<T>(Stream stream) {
@@ -231,18 +199,18 @@ namespace ClientServerLib {
             return input();
         }
 
-        protected int GetInputData(ValueRequirement requirement, string inputMessage = null) {
+        protected int GetInputData(ValueRequirement valueRequirement, string messageForInput = null) {
             int resultData = 0;
             while (true) {
-                if (inputMessage != null) {
-                    PrintMessage(inputMessage);
+                if (messageForInput != null) {
+                    PrintMessage(messageForInput);
                 }
-                if (int.TryParse(InputData(), out int inputvalue) && requirement(inputvalue)) {
+                if (int.TryParse(InputData(), out int inputvalue) && valueRequirement(inputvalue)) {
                     resultData = inputvalue;
                     break;
                 }
                 else {
-                    PrintMessage("Неверный ввод, повторите попытку.");
+                    PrintMessage("Неверный ввод, повторите попытку!");
                 }
             }
             return resultData;

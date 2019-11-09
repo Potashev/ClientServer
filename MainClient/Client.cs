@@ -501,7 +501,8 @@ namespace ClientProject {
                 GetAcceptPortFromServer(serverSocket);
 
                 //serverSocket.Close();
-                CloseSocket(serverSocket);  //TODO: возможно закрытие перенести в finally
+                //CloseSocket(serverSocket);  //TODO: возможно закрытие перенести в finally
+                serverSocket.Close();
                 Neighbors.Sort(Neighbour.CompareUnitsByPriority); // TODO: возможно сортировку перенести на сервер перед отправкой
                 WriteTopologyToFiles();
             }
