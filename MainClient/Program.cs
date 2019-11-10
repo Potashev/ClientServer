@@ -16,7 +16,7 @@ namespace ClientProject
     {
 
         static void Main(string[] args) {
-            Console.WriteLine("\tClient!))");
+            Console.WriteLine("\tClient)))");
             //Console.Write("Время генерации: ");
             //InputGenerationTime(out int time);
 

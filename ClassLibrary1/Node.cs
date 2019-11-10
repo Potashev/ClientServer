@@ -114,7 +114,15 @@ namespace ClientServerLib {
                         List<DataPacket> receivedPackets = GetDataFromBuffer(acumBuffer.ToArray());
                         AddPacketsInSequence(receivedPackets);
 
+                        //PrintMessage("НАЧАЛО MAIN");
                         eventPacketSequenceAdded(receivedPackets);
+                        //PrintMessage("КОНЕЦ MAIN");
+
+
+                        //await Task.Run(() => eventPacketSequenceAdded(receivedPackets));
+                        //PrintMessage("НАЧАЛО MAIN..");
+                        //await Task.Run(() => TESTFUNC());
+                        //PrintMessage("КОНЕЦ MAIN");
                     }
                     else {
                         PrintMessage("СОЕДИНЕНИЕ ВОССТАНОВЛЕНО!!!");
@@ -125,6 +133,12 @@ namespace ClientServerLib {
                 }
 
             }
+        }
+
+        void TESTFUNC() {
+            PrintMessage("НАЧАЛО ASYNC..");
+            Thread.Sleep(3000);
+            PrintMessage("КОНЕЦ ASYNC!");
         }
 
         protected List<DataPacket> GetDataFromBuffer(byte[] buffer) {
@@ -140,8 +154,13 @@ namespace ClientServerLib {
         }
 
         protected void SerializeJson<T>(List<T> objectsList, Stream stream) {
-            DataContractJsonSerializer jsonSerializer = new DataContractJsonSerializer(typeof(List<T>));    
-            jsonSerializer.WriteObject(stream, objectsList);    // try нужен (был runtimeex на больших скоростях)
+            DataContractJsonSerializer jsonSerializer = new DataContractJsonSerializer(typeof(List<T>));
+            try {
+                jsonSerializer.WriteObject(stream, objectsList);    // try нужен (был runtimeex на больших скоростях)
+            }
+            catch (Exception ex) {
+                PrintMessage(ex.Message);
+            }
         }
 
         protected List<T> DeserializeJson<T>(Stream stream) {

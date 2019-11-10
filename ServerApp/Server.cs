@@ -41,6 +41,8 @@ namespace ServerProject {
             PrintMessage("Прием пакетов...");
 
             ReceivingProccess();
+            //await Task.Run(() => ReceivingProccess());
+
         }
 
         void WriteNumberConnectionsToServer() {

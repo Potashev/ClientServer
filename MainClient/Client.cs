@@ -68,6 +68,8 @@ namespace ClientProject {
         string idFileName = @"id.txt";
         string portFileName = @"port.txt";
 
+        bool isLocked;
+
         public Client(InputDelegate userInput, OutputDelegate userOutput, int generationTime, int checkDiedTime, int TIME) : base(userInput, userOutput) {
 
             
@@ -81,6 +83,8 @@ namespace ClientProject {
 
             SENDTIME = TIME;
 
+
+            isLocked = false;
         }
 
         public Client(InputDelegate userInput, OutputDelegate userOutput) : base(userInput, userOutput) {
@@ -97,15 +101,7 @@ namespace ClientProject {
         }
 
 
-        // метод заглушка для обработки события на клиенте
-        void TrySendNewPackets(List<DataPacket> packets = null) {
-            if (sendingAvailable) {
-                SendingProccess();
-            }
-            else {
-                PrintMessage("Отправка пакетов остановлена, накоплено пакетов " + packetsSequence.Count);
-            }
-        }
+        
 
         void SetNumberIncomingConnections() {
             int counter = 0;
@@ -159,6 +155,7 @@ namespace ClientProject {
             //TODO: сделать обертку для генерации данных GetData()
             //Thread generationThread = new Thread(Generation);
             //generationThread.Start();
+
             StartGenerationData();
 
         }
@@ -261,7 +258,10 @@ namespace ClientProject {
                     //packetsSequence.AddRange(testpackets);
 
                     //PacketSequenceAdded(testpackets);
+                    //PrintMessage("НАЧАЛО MAIN");
+                    
                     TrySendNewPackets();
+                    //PrintMessage("КОНЕЦ MAIN!!!!");
                 }
                 //SendingProccess();
             }
@@ -375,32 +375,36 @@ namespace ClientProject {
             //Thread.Sleep(1);
         }
 
+        // метод заглушка для обработки события на клиенте
+        void TrySendNewPackets(List<DataPacket> packets = null) {
+                if (sendingAvailable) {
+                    SendingProccess();
+
+                }
+                else {
+                    PrintMessage("Отправка пакетов остановлена, накоплено пакетов " + packetsSequence.Count);
+                }
+        }
+
         static protected object locker2 = new object();
 
         void SendingProccess() {
-            //SelectAddPacketSeq();
-
-            // TODO: возможно добавить проверку на пустоту PS, чтобы не отправлять его (если не синхронизирую добавление в PS)
-            if (packetsSequence.Count > 0) {
-                lock (locker) {
+            if(isLocked == false) { 
+            Monitor.Enter(locker2, ref isLocked);
+                if (packetsSequence.Count > 0) {
                     addPacketsInMainSequnce = false;
                     GetSendBuffer(out byte[] sendBuffer);
                     SendBuffer(sendBuffer, out bool successSending);
-                    PrintMessage("Число пакетов в PS после отправки " + packetsSequence.Count);
+                    //PrintMessage("Число пакетов в PS после отправки " + packetsSequence.Count);
                     if (successSending) {
-                        //ClearMainPacketsSeqqunce();
                         packetsSequence.Clear();
                     }
-                    
-                    //SelectMainPs();
-                    Thread.Sleep(SENDTIME);
                     addPacketsInMainSequnce = true;
-                }
-                    // TODO: возможно перенести окончание lock сюда - после снятия запрета?
                     TransferNewDataFromAddPS();
-                //}
+                }
+                Monitor.Exit(locker2);
+                isLocked = false;
             }
-            //Thread.Sleep(1);
         }
 
         void GetSendBuffer(out byte[] sendBuffer) {
@@ -499,9 +503,6 @@ namespace ClientProject {
                 GetNeibsFromServer(serverSocket);
                 GetUnitIdFromServer(serverSocket);
                 GetAcceptPortFromServer(serverSocket);
-
-                //serverSocket.Close();
-                //CloseSocket(serverSocket);  //TODO: возможно закрытие перенести в finally
                 serverSocket.Close();
                 Neighbors.Sort(Neighbour.CompareUnitsByPriority); // TODO: возможно сортировку перенести на сервер перед отправкой
                 WriteTopologyToFiles();

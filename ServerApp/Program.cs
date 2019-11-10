@@ -30,6 +30,8 @@ namespace ServerProject
             Server terminal = new Server(Console.ReadLine, Console.WriteLine, 660, createTopology);
 
             terminal.Run();
+            Console.WriteLine("куку");
+            Console.ReadKey();
         }
     }
 }
