@@ -9,29 +9,34 @@ using System.Threading.Tasks;
 using System.Runtime.Serialization;
 using System.Runtime.Serialization.Json;
 using System.IO;
+using ClientServerLib;
 
 namespace ServerProject
 {
     class Program
     {
         static void Main(string[] args) {
-            Console.WriteLine("\tServer");
+            Console.WriteLine("\tServerApp");
 
 
-            Console.WriteLine("Ввод топологии ?");
-            bool createTopology = false;
-            string str = Console.ReadLine();
+            Console.WriteLine("Запустить сервер в режиме формирования топологии?");
+            Console.WriteLine("+ - Да, иное - Нет");
+            bool createTopologyFlag = DefineTopologyFlag();
+            int serverAcceptPort = 660;
 
-            if (str == "+")
-            {
-                createTopology = true;
+            var server = new Server(Console.ReadLine, Console.WriteLine, serverAcceptPort);
+            server.Run(createTopologyFlag);
+        }
+
+        static bool DefineTopologyFlag() {
+            string input = Console.ReadLine();
+
+            if (input == "+") {
+                return true;
             }
-
-            Server terminal = new Server(Console.ReadLine, Console.WriteLine, 660, createTopology);
-
-            terminal.Run();
-            Console.WriteLine("куку");
-            Console.ReadKey();
+            else {
+                return false;
+            }
         }
     }
 }
