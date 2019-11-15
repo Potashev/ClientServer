@@ -14,24 +14,16 @@ namespace ClientServerLib {
         
         static int packetCounter = 1;
 
-        public DataPacket(int nodeId) {
+        public DataPacket(int data, int nodeId) {
             clientId        = nodeId;
             packetNumber    = packetCounter;
-            datavalue       = CreateValue();
+            datavalue       = data;
             packetCounter++;
         }
-
+        
         public string GetInfo() {
             string packetInfo = $"Узел: {clientId}, пакет: {packetNumber} , значение: {datavalue}";
             return packetInfo;
         }
-
-        private int CreateValue() {
-            Random rand = new Random();
-            int value = rand.Next(1, 1000);
-            return value;
-        }
-
-        
     }
 }

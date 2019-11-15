@@ -1,5 +1,4 @@
-﻿using ClientServerLib;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
@@ -9,30 +8,8 @@ using System.Threading;
 using System.Threading.Tasks;
 
 namespace ClientServerLib {
-
     public class Client : Node {
         
-        private int clientId;
-
-        private bool addPacketsInMainSequnce;
-        private bool sendingAvailable;
-        private bool sendingInProcess;
-        
-        public int TimeGeneration {
-            get {
-                return timeGeneration;
-            }
-            set {
-                if(value > 0) {
-                    timeGeneration = value;
-                }
-                else {
-                    timeGeneration = 100;
-                }
-            }
-        }
-        private int timeGeneration;
-
         public int TimeCheckingLost {
             get {
                 return timeCheckingLost;
@@ -48,28 +25,35 @@ namespace ClientServerLib {
         }
         private int timeCheckingLost;
 
-        List<DataPacket> additionalPacketsSequence = new List<DataPacket>();
+        private int clientId;
 
-        List<Neighbour> Neighbors = new List<Neighbour>();
-        Neighbour currentNeighbourForSending;
+        private List<DataPacket> additionalPacketsSequence = new List<DataPacket>();
 
-        Thread CheckingDiedNodesThread;
+        private List<Neighbour> Neighbors = new List<Neighbour>();
+        private Neighbour currentNeighbourForSending;
         
+        private bool sendingAvailable;
+        private bool sendingInProcess;
+        private bool checkingInProcess;
+
         private object sendLocker = new object();
         private object addSequenceLocker = new object();
         
-        public Client(InputDelegate userInput, OutputDelegate userOutput, int generationTime, int checkLostTime) : base(userInput, userOutput) {
-            TimeGeneration = generationTime;
+        public Client(InputDelegate userInput, OutputDelegate userOutput, int checkLostTime) : base(userInput, userOutput) {
             timeCheckingLost = checkLostTime;
-            CheckingDiedNodesThread = new Thread(CheckingLostNodes);
-            addPacketsInMainSequnce = true;
             sendingAvailable = true;
             sendingInProcess = false;
+            checkingInProcess = false;
             eventPacketSequenceAdded += TrySendNewPackets;
         }
 
-        public void Run() {
+        public void AddNewData(int dataValue) {
+            var packet = new DataPacket(dataValue, clientId);
+            AddPacketsInSequence(new List<DataPacket> {packet});
+            TrySendNewPackets();
+        }
 
+        async public void StartAsync() {
             if (File.Exists(TOPOLOGY_FILENAME)) {
                 PrintMessage("Восстановление топологии.");
                 GetTopologyFromFile();
@@ -87,18 +71,17 @@ namespace ClientServerLib {
 
             FindNeighbourForSending();
 
-            PrintMessage("Нажмите клавишу для запуска:");
+            PrintMessage("Нажмите клавишу для запуска..");
             InputData();
             
             if (HasInConnection()) {
                 PrintMessage("Есть входящие подключения.");
-                StartReceiving();
+                await Task.Run(() => ReceivingProccess());
+
             }
             else {
                 PrintMessage("Входящих подключений нет.");
             }
-
-            StartGenerationData();
         }
 
         void GetTopologyFromFile() {
@@ -151,13 +134,11 @@ namespace ClientServerLib {
 
         void GetUnitIdFromServer(Socket socket) {
             byte[] receiveId = new byte[1000];
-                socket.Receive(receiveId);
-
-
-                byte[] arr = new byte[BytesInCollection(receiveId)];
-                CopyFromTo(receiveId, arr);
-                string strId = Encoding.ASCII.GetString(arr);
-                clientId = int.Parse(strId);
+            socket.Receive(receiveId);
+            byte[] arr = new byte[BytesInCollection(receiveId)];
+            CopyFromTo(receiveId, arr);
+            string strId = Encoding.ASCII.GetString(arr);
+            clientId = int.Parse(strId);
         }
 
         void GetAcceptPortFromServer(Socket socket) {
@@ -180,10 +161,9 @@ namespace ClientServerLib {
         }
 
         void ShowConfiguration() {
-            PrintMessage($"Время генерации пакета (мс): {TimeGeneration}");
             PrintMessage($"Периодичность проверки узлов (мс): {TimeCheckingLost}");
-            PrintMessage($"Id: {clientId}");
-            PrintMessage($"Accept port: {AcceptPort}");
+            PrintMessage($"Номер узла в топологии: {clientId}");
+            PrintMessage($"Порт приема: {AcceptPort}");
         }
 
         void ShowNeighbours() {
@@ -214,10 +194,9 @@ namespace ClientServerLib {
                     sendingAvailable = true;
                     break;
                 }
-                else if ((n.IsBest()) && (n.IsDied) && (!CheckingDiedNodesThread.IsAlive)) {
+                else if ((n.IsBest()) && (n.IsDied) && (checkingInProcess == false)) {
                     PrintMessage("Запуск проверки узлов для восстановления..");
-                    StartChecking();
-
+                    StartCheckingAsync();
                 }
             }
             if (!success) {
@@ -233,8 +212,9 @@ namespace ClientServerLib {
             }
             return false;
         }
-
+        
         void CheckingLostNodes() {
+            checkingInProcess = true;
             bool needChecking = true;
             while (needChecking) {
                 Thread.Sleep(TimeCheckingLost);
@@ -259,31 +239,13 @@ namespace ClientServerLib {
                     }
                 }
             }
+            checkingInProcess = false;
             PrintMessage("Проверка узлов для восстановления окончена.");
-        }
-        
-        List<DataPacket> CreateData(int packetsNumber) {
-            List<DataPacket> result = new List<DataPacket>();
-
-            for (int i = 0; i < packetsNumber; i++) {
-                DataPacket newPacket = new DataPacket(clientId);
-                result.Add(newPacket);
-            }
-            return result;
-        }
-        
-        void Generation() {
-            while (true) {
-                Thread.Sleep(TimeGeneration);
-                List<DataPacket> testpackets = CreateData(1);
-                AddPacketsInSequence(testpackets);
-                TrySendNewPackets();
-            }
         }
         
         override protected void AddPacketsInSequence(List<DataPacket> packets) {
             lock (addSequenceLocker) {
-                if (addPacketsInMainSequnce) {
+                if (sendingInProcess == false) {
                     packetsSequence.AddRange(packets);
                 }
                 else {
@@ -294,30 +256,29 @@ namespace ClientServerLib {
         
         void TrySendNewPackets(List<DataPacket> packets = null) {
             if (sendingInProcess == false) {
-                Monitor.Enter(sendLocker, ref sendingInProcess);
-                if (sendingAvailable) {
-                    SendingProccess();
+                lock (sendLocker) {
+                    if (sendingAvailable) {
+                        SendingProccess();
 
+                    }
+                    else {
+                        PrintMessage("Отправка пакетов остановлена, накоплено пакетов " + packetsSequence.Count);
+                    }
                 }
-                else {
-                    PrintMessage("Отправка пакетов остановлена, накоплено пакетов " + packetsSequence.Count);
-                }
-                Monitor.Exit(sendLocker);
-                sendingInProcess = false;
             }
         }
         
         void SendingProccess() {
-                if (packetsSequence.Count > 0) {
-                    addPacketsInMainSequnce = false;
+            if (packetsSequence.Count > 0) {
+                    sendingInProcess = true;
                     GetSendBuffer(out byte[] sendBuffer);
                     SendBuffer(sendBuffer, out bool successSending);
                     if (successSending) {
                         packetsSequence.Clear();
                     }
-                    addPacketsInMainSequnce = true;
+                    sendingInProcess = false;
                     TransferNewDataFromAddPS();
-                }
+            }
         }
 
         void GetSendBuffer(out byte[] sendBuffer) {
@@ -352,19 +313,8 @@ namespace ClientServerLib {
             additionalPacketsSequence.Clear();
         }
         
-        void StartChecking() {
-            CheckingDiedNodesThread = new Thread(CheckingLostNodes);
-            CheckingDiedNodesThread.Start();
-        }
-
-        void StartReceiving() {
-            Thread acceptThread = new Thread(ReceivingProccess);
-            acceptThread.Start();
-        }
-
-        void StartGenerationData() {
-            Thread generationThread = new Thread(Generation);
-            generationThread.Start();
+        async void StartCheckingAsync() {
+            await Task.Run(() => CheckingLostNodes());
         }
 
         private const string TOPOLOGY_FILENAME = "topology.json";

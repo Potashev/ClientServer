@@ -1,20 +1,19 @@
-﻿using ClientServerLib;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace ClientServerLib {
     public class Server: Node {
+
         public Server(InputDelegate userInput, OutputDelegate userOutput, int acceptPort) : base(userInput, userOutput) {
             AcceptPort = acceptPort;
             eventPacketSequenceAdded += PrintNewPackets;
         }
 
-        public void Run(bool createTopology = false) {
+        public void Start(bool createTopology = false) {
 
             if (createTopology) {
                 PrintMessage("Формирование топологии.");

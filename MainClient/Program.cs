@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading;
 using ClientServerLib;
 
 namespace ClientProject
@@ -14,10 +15,19 @@ namespace ClientProject
             Console.WriteLine("Введите периодичность проверки узлов топологии, \nсоединение с которыми было потеряно (мс):");
             int checkLostNodeTime = InputTimeValue();
 
-            //TODO: вводить IP сервера вручную
+            var client = new Client(Console.ReadLine, Console.WriteLine, checkLostNodeTime);
+            client.StartAsync();
 
-            var client = new Client(Console.ReadLine, Console.WriteLine, generationTime, checkLostNodeTime);
-            client.Run();
+            while (true) {
+                GenerationData(generationTime, out int data);
+                client.AddNewData(data);
+            }
+        }
+
+        static void GenerationData(int generationTime, out int datavalue) {
+            Random rand = new Random();
+            Thread.Sleep(generationTime);
+            datavalue = rand.Next(1, 1000);
         }
 
         static int InputTimeValue() {

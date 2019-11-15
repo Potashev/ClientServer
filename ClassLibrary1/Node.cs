@@ -27,9 +27,6 @@ namespace ClientServerLib {
         protected List<DataPacket> packetsSequence = new List<DataPacket>();
 
         protected int numberIncomingConnections;
-
-        //protected const string SERVER_IP = "192.168.1.106"; // TODO: временно
-        protected const int SERVER_PORT_FOR_TOPOLOGY = 1000;
         
         protected readonly InputDelegate input;
         protected readonly OutputDelegate output;
@@ -75,8 +72,8 @@ namespace ClientServerLib {
                     if (size > 0) {
                         List<DataPacket> receivedPackets = GetDataFromBuffer(acumBuffer.ToArray());
                         AddPacketsInSequence(receivedPackets);
-
-                        PrintMessageReceivingPackets(receivedPackets.Count);
+                        
+                        PrintMessage($"Получено сообщение. Число пакетов: {receivedPackets.Count}");
 
                         eventPacketSequenceAdded(receivedPackets);
                     }
@@ -210,20 +207,7 @@ namespace ClientServerLib {
             return addr[0];
         }
         
-        void PrintMessageReceivingPackets(int packetsInMessage) {
-            string messageEnding;
-            if (packetsInMessage == 1) {
-                messageEnding = "пакет";
-            }
-            else if ((packetsInMessage > 1) && (packetsInMessage < 5)) {
-                messageEnding = "пакета";
-            }
-            else {
-                messageEnding = "пакетов";
-            }
-            PrintMessage($"Получено сообщение. Содержит {packetsInMessage} {messageEnding}.");
-        }
-
+        protected const int SERVER_PORT_FOR_TOPOLOGY = 1000;
     }
 
     public delegate string InputDelegate();
